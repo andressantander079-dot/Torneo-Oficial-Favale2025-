@@ -1,5 +1,4 @@
 import { Category, Gender, Team, Match, StaffMember, LocationGuide, Court } from './types';
-import { v4 as uuidv4 } from 'uuid'; // Simulating ID generation
 
 // Helper to create initial data
 const createId = () => Math.random().toString(36).substr(2, 9);

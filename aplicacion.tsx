@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Lock, Unlock, Calendar, Trophy, Users, Map as MapIcon, Info, 
-  Menu, X, ChevronDown, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Save, Loader2, WifiOff
+  Lock, Calendar, Trophy, Users, Map as MapIcon, Info, 
+  Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2
 } from 'lucide-react';
 import { INITIAL_LOCATIONS } from './constants';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
-import { generateTable, calculatePoints } from './utils';
+import { generateTable } from './utils';
 import { supabase } from './supabaseClient';
 
 // --- HELPERS: DATABASE MAPPING ---
