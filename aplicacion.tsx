@@ -11,47 +11,44 @@ import { supabase } from './supabaseClient';
 
 // --- HELPERS: DATABASE MAPPING ---
 
-// Mapeo Base de Datos (Español) -> Aplicación (Inglés/Interno)
 const mapTeamFromDB = (t: any): Team => ({
     id: t.id,
-    name: t.nombre,          // Base de datos: nombre
-    category: t.categoria,   // Base de datos: categoria
-    gender: t.genero,        // Base de datos: genero
-    zone: t.zona,            // Base de datos: zona
-    // Mapeo de jugadores (Asegúrate de que la tabla 'jugadores' tenga: nombre, numero, posicion)
+    name: t.nombre,
+    category: t.categoria,
+    gender: t.genero,
+    zone: t.zona,
     players: t.jugadores ? t.jugadores.map((p: any) => ({
-        id: p.id || uuidv4(), // Fallback si no hay ID
-        name: p.nombre,      // Base de datos: nombre
-        number: p.numero,    // Base de datos: numero
-        position: p.posicion // Base de datos: posicion
+        id: p.id,
+        name: p.nombre,
+        number: p.numero,
+        position: p.posicion
     })).sort((a: any, b: any) => Number(a.number) - Number(b.number)) : []
 });
 
 const mapMatchFromDB = (m: any): Match => ({
     id: m.id,
-    date: m.fecha,            // Base de datos: fecha
-    time: (m.hora && typeof m.hora === 'string') ? m.hora.slice(0, 5) : '00:00', // Base de datos: hora (texto)
-    court: m.lugar,           // Base de datos: lugar
-    category: m.categoria,    // Base de datos: categoria
-    gender: m.genero,         // Base de datos: genero
-    homeTeamId: m.local,      // Base de datos: local
-    awayTeamId: m.visitante,  // Base de datos: visitante
-    isFinished: m.is_finished, // Base de datos: is_finished (booleano)
-    sets: m.sets || [],       // Base de datos: sets (json)
-    mvpHomeId: m.mvp_home_id, // Base de datos: mvp_home_id
-    mvpAwayId: m.mvp_away_id, // Base de datos: mvp_away_id
-    stage: m.stage
+    date: m.fecha,
+    time: (m.hora && typeof m.hora === 'string') ? m.hora.slice(0, 5) : '00:00',
+    court: m.lugar,
+    category: m.categoria,
+    gender: m.genero,
+    homeTeamId: m.local,
+    awayTeamId: m.visitante,
+    isFinished: m.is_finished,
+    sets: typeof m.sets === 'string' ? JSON.parse(m.sets) : (m.sets || []),
+    mvpHomeId: m.mvp_home_id,
+    mvpAwayId: m.mvp_away_id,
+    stage: 'Fase Regular'
 });
 
 const mapStaffFromDB = (s: any): StaffMember => ({
     id: s.id,
-    name: s.nombre,           // Base de datos: nombre
-    role: s.rol               // Base de datos: rol
+    name: s.nombre,
+    role: s.rol
 });
 
 // --- COMPONENTS ---
 
-// 1. Navigation & Layout
 const TabButton = ({ active, label, icon: Icon, onClick }: any) => (
   <button 
     onClick={onClick}
@@ -64,7 +61,6 @@ const TabButton = ({ active, label, icon: Icon, onClick }: any) => (
   </button>
 );
 
-// 2. Views
 const HomeView = () => (
   <div className="space-y-6 animate-fade-in pb-20">
     <div className="bg-gradient-to-br from-favale-dark to-favale-primary text-white p-6 rounded-3xl shadow-xl mx-4 mt-4">
@@ -111,8 +107,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
   const [filterGender, setFilterGender] = useState<string>('Todas');
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [matchToDelete, setMatchToDelete] = useState<Match | null>(null);
-
-  // New Match State
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMatchData, setNewMatchData] = useState<Partial<Match>>({
     category: Category.SUB12,
@@ -121,8 +115,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
     date: new Date().toISOString().split('T')[0],
     time: '12:00'
   });
-
-  // Confirmation Modal State
   const [confirmData, setConfirmData] = useState<{match: Match, sets: any[], homeMvp?: string, awayMvp?: string} | null>(null);
 
   const filteredMatches = matches.filter((m: Match) => {
@@ -160,6 +152,7 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
   }
 
   const getFormattedDate = (dateStr: string) => {
+      if(!dateStr) return '';
       const days = ['DOMINGO','LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO'];
       const date = new Date(dateStr + 'T12:00:00');
       const dayName = days[date.getDay()];
@@ -171,7 +164,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
 
   return (
     <div className="pb-24 px-4 pt-4">
-      {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-6 sticky top-0 z-10 border-b border-gray-100">
         <div className="relative mb-3">
             <input 
@@ -189,9 +181,7 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                     key={cat}
                     onClick={() => setFilterCat(cat)}
                     className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        filterCat === cat 
-                        ? 'bg-favale-dark text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        filterCat === cat ? 'bg-favale-dark text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
                     {cat}
@@ -204,9 +194,7 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                     key={g}
                     onClick={() => setFilterGender(g)}
                     className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        filterGender === g 
-                        ? 'bg-favale-accent text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        filterGender === g ? 'bg-favale-accent text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
                     {g}
@@ -224,7 +212,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
           </button>
       )}
 
-      {/* Match List */}
       <div className="space-y-4">
         {filteredMatches.length === 0 ? (
             <div className="text-center text-gray-400 py-10">No hay partidos encontrados</div>
@@ -296,7 +283,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
         })}
       </div>
 
-      {/* Add Match Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-fade-in">
@@ -345,7 +331,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
         </div>
       )}
 
-      {/* Edit Result Modal */}
       {editingMatch && (
         <ResultModal 
             match={editingMatch} 
@@ -355,7 +340,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
         />
       )}
 
-      {/* Confirm Save Modal */}
       {confirmData && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
              <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in">
@@ -382,7 +366,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {matchToDelete && (
         <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in">
@@ -500,7 +483,6 @@ const TableView = ({ matches, teams, isLoading }: any) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>(Category.SUB13);
   const [selectedGender, setSelectedGender] = useState<Gender>(Gender.FEMALE);
 
-  // Helper to render a table block
   const RenderTableBlock = ({ title, data }: { title: string, data: any[] }) => (
     <div className="mb-8">
       <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 pl-2 border-l-4 border-favale-accent">{title}</h3>
@@ -536,17 +518,13 @@ const TableView = ({ matches, teams, isLoading }: any) => {
   
   if (isLoading) return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-favale-primary" size={48} /></div>;
 
-  // Generate table based on gender
   const genderTeams = teams.filter((t:Team) => t.gender === selectedGender);
 
-  // Determine what to render based on category logic
   const renderContent = () => {
       if (selectedCategory === Category.SUB13) {
           const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
           const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
 
-          // Get the qualified team objects to recalculate tables properly (implementing "Carry Over" logic)
-          // We take the top 2 teams from the Zone tables to identify WHO is in Copa Oro
           const goldTeamsIds = [...zoneA.slice(0, 2), ...zoneB.slice(0, 2)].map(r => r.teamId);
           const silverTeamsIds = [...zoneA.slice(2, 4), ...zoneB.slice(2, 4)].map(r => r.teamId);
 
@@ -576,7 +554,6 @@ const TableView = ({ matches, teams, isLoading }: any) => {
               </>
           );
       } else {
-          // Sub 12 and 16 are usually Single Zone (Unica) or simple structure for this demo
           const table = generateTable(matches, genderTeams, selectedCategory);
           return <RenderTableBlock title="Tabla General" data={table} />;
       }
@@ -586,7 +563,6 @@ const TableView = ({ matches, teams, isLoading }: any) => {
     <div className="pb-24 px-4 pt-6">
       <h2 className="text-2xl font-bold text-favale-dark mb-4">Tabla de Posiciones</h2>
       
-      {/* Gender Selector */}
       <div className="flex bg-gray-100 rounded-lg p-1 mb-4 w-fit">
         {Object.values(Gender).map(gender => (
             <button
@@ -601,7 +577,6 @@ const TableView = ({ matches, teams, isLoading }: any) => {
         ))}
       </div>
 
-      {/* Category Selector */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 mb-2">
         {Object.values(Category).map(cat => (
             <button 
@@ -654,7 +629,7 @@ const AddTeamModal = ({ onClose, onSave }: any) => {
     const handleSubmit = () => {
         if (!name) return;
         const newTeam: Team = {
-            id: '', // Will be generated by DB
+            id: '', 
             name,
             category,
             gender,
@@ -719,7 +694,7 @@ const TeamEditModal = ({ team, onClose, onSave }: any) => {
     const handleAddPlayer = () => {
         if (!newPlayerName || !newPlayerNumber) return;
         const newPlayer: Player = {
-            id: uuidv4(), // Use uuidv4() directly
+            id: uuidv4(), // ID temporal para la UI, no se enviará a la BD
             name: newPlayerName,
             number: parseInt(newPlayerNumber),
             position: newPlayerPos || 'Jugadora'
@@ -811,12 +786,10 @@ const TeamEditModal = ({ team, onClose, onSave }: any) => {
 const TeamDetailModal = ({ team, matches, onClose }: any) => {
     const [activeTab, setActiveTab] = useState<'plantel' | 'partidos' | 'mvps'>('plantel');
 
-    // Upcoming matches
     const upcoming = matches
         .filter((m: Match) => (m.homeTeamId === team.id || m.awayTeamId === team.id))
         .sort((a: Match, b: Match) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
 
-    // MVPs
     const mvps: {match: Match, player: Player}[] = [];
     matches.filter((m: Match) => m.isFinished).forEach((m: Match) => {
         if (m.mvpHomeId) {
@@ -882,7 +855,6 @@ const TeamDetailModal = ({ team, matches, onClose }: any) => {
                              {upcoming.length === 0 ? <p className="text-sm text-gray-400 italic text-center py-4">No hay partidos registrados.</p> : (
                                  upcoming.map((m: Match) => {
                                      const isHome = m.homeTeamId === team.id;
-                                     // const opponentId = isHome ? m.awayTeamId : m.homeTeamId;
                                      return (
                                      <div key={m.id} className={`p-3 rounded-lg border ${m.isFinished ? 'bg-gray-50 border-gray-200' : 'bg-green-50 border-green-100'}`}>
                                          <div className="text-xs text-gray-500 font-bold mb-2 flex justify-between">
@@ -951,7 +923,6 @@ const TeamsView = ({ teams, matches, isAdmin, onUpdateTeam, onAddTeam, onDeleteT
 
   return (
     <div className="pb-24 px-4 pt-4">
-       {/* Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm mb-6 sticky top-0 z-10 border-b border-gray-100">
         <div className="relative mb-3">
             <input 
