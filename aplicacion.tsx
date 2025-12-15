@@ -541,7 +541,7 @@ const TableView = ({ matches, teams, isLoading }: any) => {
 
   // Determine what to render based on category logic
   const renderContent = () => {
-      if (selectedCategory === Category.SUB13) {
+      if (selectedCategory === Category.SUB13 && selectedGender === Gender.FEMALE) {
           const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
           const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
 
