@@ -10,13 +10,13 @@ import { supabase } from './supabaseClient';
 
 // --- HELPERS: DATABASE MAPPING ---
 
-// Map Database (snake_case) -> App (camelCase)
+// Map Database (snake_case/Spanish) -> App (camelCase/English)
 const mapTeamFromDB = (t: any): Team => ({
     id: t.id,
-    name: t.name,
-    category: t.category,
-    gender: t.gender,
-    zone: t.zone,
+    name: t.nombre, // Mapped from 'nombre'
+    category: t.categoria, // Mapped from 'categoria'
+    gender: t.genero, // Mapped from 'genero'
+    zone: t.zona, // Mapped from 'zona'
     // Supabase returns joined relations as nested objects/arrays using the table name 'jugadores'
     players: t.jugadores ? t.jugadores.map((p: any) => ({
         id: p.id,
@@ -1304,26 +1304,29 @@ const App = () => {
 
   const handleAddTeam = async (newTeam: Team) => {
       // 1. Create Team (equipos)
+      // Usar nombres de columnas en español
       const dbTeam = {
-          name: newTeam.name,
-          category: newTeam.category,
-          gender: newTeam.gender,
-          zone: newTeam.zone
+          nombre: newTeam.name,
+          categoria: newTeam.category,
+          genero: newTeam.gender,
+          zona: newTeam.zone
       };
       const { data, error } = await supabase.from('equipos').insert([dbTeam]).select();
       if (!error && data) {
           const createdTeam = mapTeamFromDB(data[0]);
           setTeams([...teams, createdTeam]);
       } else {
+          console.error(error);
           alert('Error creando equipo (Tabla equipos)');
       }
   };
 
   const handleUpdateTeam = async (updatedTeam: Team) => {
     // 1. Update Team Details
+    // Usar nombres de columnas en español
     const dbTeam = {
-        name: updatedTeam.name,
-        zone: updatedTeam.zone
+        nombre: updatedTeam.name,
+        zona: updatedTeam.zone
     };
     const { error: teamError } = await supabase.from('equipos').update(dbTeam).eq('id', updatedTeam.id);
     
