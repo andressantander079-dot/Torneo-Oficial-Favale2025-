@@ -20,7 +20,7 @@ const mapTeamFromDB = (t: any): Team => ({
     zone: t.zona,            // Base de datos: zona
     // Mapeo de jugadores (Asegúrate de que la tabla 'jugadores' tenga: nombre, numero, posicion)
     players: t.jugadores ? t.jugadores.map((p: any) => ({
-        id: p.id,
+        id: p.id || uuidv4(), // Fallback si no hay ID
         name: p.nombre,      // Base de datos: nombre
         number: p.numero,    // Base de datos: numero
         position: p.posicion // Base de datos: posicion
@@ -719,7 +719,7 @@ const TeamEditModal = ({ team, onClose, onSave }: any) => {
     const handleAddPlayer = () => {
         if (!newPlayerName || !newPlayerNumber) return;
         const newPlayer: Player = {
-            id: `temp-${uuidv4()}`, // Temporary ID for UI
+            id: uuidv4(), // Use uuidv4() directly
             name: newPlayerName,
             number: parseInt(newPlayerNumber),
             position: newPlayerPos || 'Jugadora'
@@ -938,6 +938,7 @@ const TeamsView = ({ teams, matches, isAdmin, onUpdateTeam, onAddTeam, onDeleteT
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
 
   const filteredTeams = teams.filter((t: Team) => {
     const searchMatch = t.name.toLowerCase().includes(filterText.toLowerCase());
@@ -1010,7 +1011,7 @@ const TeamsView = ({ teams, matches, isAdmin, onUpdateTeam, onAddTeam, onDeleteT
                 team={team} 
                 isAdmin={isAdmin} 
                 onEdit={setEditingTeam} 
-                onDelete={onDeleteTeam}
+                onDelete={() => setTeamToDelete(team)}
                 onClick={setSelectedTeam}
               />
           ))}
@@ -1019,6 +1020,26 @@ const TeamsView = ({ teams, matches, isAdmin, onUpdateTeam, onAddTeam, onDeleteT
       {showAddModal && <AddTeamModal onClose={() => setShowAddModal(false)} onSave={(t:Team) => { onAddTeam(t); setShowAddModal(false); }} />}
       {editingTeam && <TeamEditModal team={editingTeam} onClose={() => setEditingTeam(null)} onSave={(t:Team) => { onUpdateTeam(t); setEditingTeam(null); }} />}
       {selectedTeam && <TeamDetailModal team={selectedTeam} matches={matches} onClose={() => setSelectedTeam(null)} />}
+      
+      {teamToDelete && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in">
+                <div className="flex justify-center mb-4 text-red-500">
+                        <AlertTriangle size={48} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-800 mb-2 text-center">¿Eliminar Equipo?</h3>
+                <p className="text-sm text-gray-500 mb-6 text-center">
+                    Estás a punto de eliminar el equipo <br/>
+                    <span className="font-bold text-favale-dark">{teamToDelete.name}</span>. 
+                    <br/>Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2">
+                    <button onClick={() => setTeamToDelete(null)} className="flex-1 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
+                    <button onClick={() => { onDeleteTeam(teamToDelete.id); setTeamToDelete(null); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 shadow-md shadow-red-200">Eliminar</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1212,10 +1233,10 @@ const App = () => {
         // 1. Fetch Teams (equipos) - SIN JOIN
         const { data: teamsData, error: teamsError } = await supabase
             .from('equipos')
-            .select('*');
+            .select('id, nombre, categoria, genero, zona'); // Columnas explicitas para evitar errores de cache
             
         if (teamsError) { 
-             console.error('Error cargando equipos:', JSON.stringify(teamsError));
+             console.error('Error cargando equipos:', JSON.stringify(teamsError, null, 2));
         }
 
         // 2. Fetch Players (jugadores) - SEPARADO para evitar error de relación
@@ -1224,19 +1245,19 @@ const App = () => {
             .select('*');
 
         if (playersError) {
-            console.error('Error cargando jugadores:', JSON.stringify(playersError));
+            console.error('Error cargando jugadores:', JSON.stringify(playersError, null, 2));
         }
 
         // Fetch Matches (partidos)
         const { data: matchesData, error: matchesError } = await supabase.from('partidos').select('*');
         if (matchesError) {
-             console.error('Error cargando partidos:', JSON.stringify(matchesError));
+             console.error('Error cargando partidos:', JSON.stringify(matchesError, null, 2));
         }
 
         // Fetch Staff (personal)
         const { data: staffData, error: staffError } = await supabase.from('personal').select('*');
         if (staffError) {
-             console.error('Error cargando staff:', JSON.stringify(staffError));
+             console.error('Error cargando staff:', JSON.stringify(staffError, null, 2));
         }
 
         // Combinar equipos y jugadores manualmente
@@ -1252,7 +1273,7 @@ const App = () => {
         if (staffData) setStaff(staffData.map(mapStaffFromDB));
 
     } catch (error: any) {
-        console.error('Error crítico en carga:', error.message || error);
+        console.error('Error crítico en carga:', JSON.stringify(error, null, 2));
     } finally {
         setIsLoading(false);
     }
@@ -1284,8 +1305,8 @@ const App = () => {
       if (!error && data) {
           setMatches([...matches, mapMatchFromDB(data[0])]);
       } else {
-          console.error(error);
-          alert('Error creando partido. Verifica que la tabla "partidos" tenga las columnas: categoria, genero, is_finished, sets');
+          console.error('Error creating match:', JSON.stringify(error, null, 2));
+          alert('Error creando partido. Verifica que la tabla "partidos" tenga las columnas correctas.');
       }
   };
 
@@ -1302,6 +1323,7 @@ const App = () => {
     if (!error) {
         setMatches(matches.map(m => m.id === updatedMatch.id ? updatedMatch : m));
     } else {
+        console.error('Error updating match:', JSON.stringify(error, null, 2));
         alert('Error actualizando resultado');
     }
   };
@@ -1311,6 +1333,7 @@ const App = () => {
       if (!error) {
           setMatches(matches.filter(m => m.id !== id));
       } else {
+          console.error('Error deleting match:', JSON.stringify(error, null, 2));
           alert('Error eliminando partido');
       }
   };
@@ -1330,7 +1353,7 @@ const App = () => {
           const createdTeam = { ...mapTeamFromDB(data[0]), players: [] }; 
           setTeams([...teams, createdTeam]);
       } else {
-          console.error(error);
+          console.error('Error creating team:', JSON.stringify(error, null, 2));
           alert('Error creando equipo. Verifica tabla "equipos"');
       }
   };
@@ -1339,8 +1362,10 @@ const App = () => {
     // Find original team to detect deletions
     const originalTeam = teams.find(t => t.id === updatedTeam.id);
     const originalPlayerIds = originalTeam ? originalTeam.players.map(p => p.id) : [];
-    const currentPlayerIds = updatedTeam.players.map(p => p.id).filter(id => !id.startsWith('temp-'));
+    // With client-side UUIDs, all players (new and old) have IDs.
+    const currentPlayerIds = updatedTeam.players.map(p => p.id);
     
+    // IDs present in original but missing in current should be deleted
     const idsToDelete = originalPlayerIds.filter(id => !currentPlayerIds.includes(id));
 
     // 1. Update Team Details
@@ -1355,25 +1380,26 @@ const App = () => {
         // Delete removed players
         if (idsToDelete.length > 0) {
             const { error: deleteError } = await supabase.from('jugadores').delete().in('id', idsToDelete);
-            if (deleteError) console.error('Error eliminando jugadores:', deleteError);
+            if (deleteError) console.error('Error eliminando jugadores:', JSON.stringify(deleteError, null, 2));
         }
 
         const dbPlayers = updatedTeam.players.map(p => ({
-            id: p.id.startsWith('temp-') ? undefined : p.id, 
+            id: p.id, // Use the ID directly (either existing or new UUID)
             team_id: updatedTeam.id,
             nombre: p.name,      // CORREGIDO: antes enviaba 'name'
             numero: p.number,    // CORREGIDO: antes enviaba 'number'
             posicion: p.position // CORREGIDO: antes enviaba 'position'
         }));
 
-        // Upsert players
+        // Upsert players (insert if new ID, update if existing ID)
         if (dbPlayers.length > 0) {
              const { error: playersError } = await supabase.from('jugadores').upsert(dbPlayers);
-             if (playersError) console.error('Error sincronizando jugadores:', playersError);
+             if (playersError) console.error('Error sincronizando jugadores:', JSON.stringify(playersError, null, 2));
         }
 
         fetchData(); 
     } else {
+        console.error('Error updating team:', JSON.stringify(teamError, null, 2));
         alert('Error actualizando equipo');
     }
   };
@@ -1383,6 +1409,7 @@ const App = () => {
       if (!error) {
           setTeams(teams.filter(t => t.id !== id));
       } else {
+          console.error('Error deleting team:', JSON.stringify(error, null, 2));
           alert('Error eliminando equipo');
       }
   };
@@ -1395,6 +1422,8 @@ const App = () => {
       const { data, error } = await supabase.from('personal').insert([dbStaff]).select();
       if (!error && data) {
           setStaff([...staff, mapStaffFromDB(data[0])]);
+      } else {
+          console.error('Error adding staff:', JSON.stringify(error, null, 2));
       }
   };
 
@@ -1402,6 +1431,8 @@ const App = () => {
       const { error } = await supabase.from('personal').update({ nombre: updatedStaff.name, rol: updatedStaff.role }).eq('id', updatedStaff.id);
       if (!error) {
           setStaff(staff.map(s => s.id === updatedStaff.id ? updatedStaff : s));
+      } else {
+          console.error('Error updating staff:', JSON.stringify(error, null, 2));
       }
   };
 
@@ -1409,6 +1440,8 @@ const App = () => {
       const { error } = await supabase.from('personal').delete().eq('id', id);
       if (!error) {
           setStaff(staff.filter(s => s.id !== id));
+      } else {
+          console.error('Error deleting staff:', JSON.stringify(error, null, 2));
       }
   };
 
