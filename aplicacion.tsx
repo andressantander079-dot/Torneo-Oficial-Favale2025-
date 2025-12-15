@@ -1336,6 +1336,13 @@ const App = () => {
   };
 
   const handleUpdateTeam = async (updatedTeam: Team) => {
+    // Find original team to detect deletions
+    const originalTeam = teams.find(t => t.id === updatedTeam.id);
+    const originalPlayerIds = originalTeam ? originalTeam.players.map(p => p.id) : [];
+    const currentPlayerIds = updatedTeam.players.map(p => p.id).filter(id => !id.startsWith('temp-'));
+
+    const idsToDelete = originalPlayerIds.filter(id => !currentPlayerIds.includes(id));
+
     // 1. Update Team Details
     const dbTeam = {
         nombre: updatedTeam.name,
@@ -1345,6 +1352,12 @@ const App = () => {
     
     // 2. Sync Players (jugadores)
     if (!teamError) {
+        // Delete removed players
+        if (idsToDelete.length > 0) {
+            const { error: deleteError } = await supabase.from('jugadores').delete().in('id', idsToDelete);
+            if (deleteError) console.error('Error eliminando jugadores:', deleteError);
+        }
+
         const dbPlayers = updatedTeam.players.map(p => ({
             id: p.id.startsWith('temp-') ? undefined : p.id,
             team_id: updatedTeam.id,
