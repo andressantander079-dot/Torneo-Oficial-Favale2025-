@@ -10,31 +10,31 @@ import { supabase } from './supabaseClient';
 
 // --- HELPERS: DATABASE MAPPING ---
 
-// Map Database (snake_case/Spanish) -> App (camelCase/English)
+// Mapeo Base de Datos (Español) -> Aplicación (Inglés/Interno)
 const mapTeamFromDB = (t: any): Team => ({
     id: t.id,
-    name: t.nombre, // Mapped from 'nombre'
-    category: t.categoria, // Mapped from 'categoria'
-    gender: t.genero, // Mapped from 'genero'
-    zone: t.zona, // Mapped from 'zona'
-    // Supabase returns joined relations as nested objects/arrays using the table name 'jugadores'
+    name: t.nombre,          // Base de datos: nombre
+    category: t.categoria,   // Base de datos: categoria
+    gender: t.genero,        // Base de datos: genero
+    zone: t.zona,            // Base de datos: zona
+    // Mapeo de jugadores
     players: t.jugadores ? t.jugadores.map((p: any) => ({
         id: p.id,
-        name: p.name,
-        number: p.number,
-        position: p.position
+        name: p.nombre,      // Base de datos: nombre
+        number: p.numero,    // Base de datos: numero
+        position: p.posicion // Base de datos: posicion
     })).sort((a: any, b: any) => a.number - b.number) : []
 });
 
 const mapMatchFromDB = (m: any): Match => ({
     id: m.id,
-    date: m.fecha, // Mapped from 'fecha'
-    time: m.hora ? m.hora.slice(0, 5) : '00:00', // Mapped from 'hora'
-    court: m.lugar, // Mapped from 'lugar'
-    category: m.categoria, // Mapped from 'categoria'
-    gender: m.genero, // Mapped from 'genero'
-    homeTeamId: m.local, // Mapped from 'local'
-    awayTeamId: m.visitante, // Mapped from 'visitante'
+    date: m.fecha,           // Base de datos: fecha
+    time: m.hora ? m.hora.slice(0, 5) : '00:00', // Base de datos: hora
+    court: m.lugar,          // Base de datos: lugar
+    category: m.categoria,   // Base de datos: categoria
+    gender: m.genero,        // Base de datos: genero
+    homeTeamId: m.local,     // Base de datos: local
+    awayTeamId: m.visitante, // Base de datos: visitante
     isFinished: m.is_finished,
     sets: m.sets || [], 
     mvpHomeId: m.mvp_home_id,
@@ -44,8 +44,8 @@ const mapMatchFromDB = (m: any): Match => ({
 
 const mapStaffFromDB = (s: any): StaffMember => ({
     id: s.id,
-    name: s.nombre, // Mapped from 'nombre'
-    role: s.rol // Mapped from 'rol'
+    name: s.nombre,          // Base de datos: nombre
+    role: s.rol              // Base de datos: rol
 });
 
 // --- COMPONENTS ---
@@ -160,7 +160,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
 
   const getFormattedDate = (dateStr: string) => {
       const days = ['DOMINGO','LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO'];
-      // Hack for timezone to ensure correct day is picked from YYYY-MM-DD
       const date = new Date(dateStr + 'T12:00:00');
       const dayName = days[date.getDay()];
       const [yyyy, mm, dd] = dateStr.split('-');
