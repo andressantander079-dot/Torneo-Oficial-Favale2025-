@@ -3,6 +3,7 @@ import {
   Lock, Calendar, Trophy, Users, Map as MapIcon, Info, 
   Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2
 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import { INITIAL_LOCATIONS } from './constants';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
 import { generateTable } from './utils';
@@ -23,13 +24,13 @@ const mapTeamFromDB = (t: any): Team => ({
         name: p.nombre,      // Base de datos: nombre
         number: p.numero,    // Base de datos: numero
         position: p.posicion // Base de datos: posicion
-    })).sort((a: any, b: any) => a.number - b.number) : []
+    })).sort((a: any, b: any) => Number(a.number) - Number(b.number)) : []
 });
 
 const mapMatchFromDB = (m: any): Match => ({
     id: m.id,
     date: m.fecha,            // Base de datos: fecha
-    time: m.hora ? m.hora.slice(0, 5) : '00:00', // Base de datos: hora (texto)
+    time: (m.hora && typeof m.hora === 'string') ? m.hora.slice(0, 5) : '00:00', // Base de datos: hora (texto)
     court: m.lugar,           // Base de datos: lugar
     category: m.categoria,    // Base de datos: categoria
     gender: m.genero,         // Base de datos: genero
@@ -410,7 +411,7 @@ const ResultModal = ({ match, teams, onClose, onSave }: any) => {
     const maxSets = isSub16 ? 5 : 3;
     const [sets, setSets] = useState<{home: string, away: string}[]>(
         match.sets.length > 0 ? match.sets.map((s:any) => ({home: s.home.toString(), away: s.away.toString()})) 
-        : Array(maxSets).fill({home: '', away: ''})
+        : Array.from({ length: maxSets }, () => ({home: '', away: ''}))
     );
     const [mvpHome, setMvpHome] = useState(match.mvpHomeId || '');
     const [mvpAway, setMvpAway] = useState(match.mvpAwayId || '');
@@ -718,7 +719,7 @@ const TeamEditModal = ({ team, onClose, onSave }: any) => {
     const handleAddPlayer = () => {
         if (!newPlayerName || !newPlayerNumber) return;
         const newPlayer: Player = {
-            id: Math.random().toString(), // Temporary ID for UI
+            id: `temp-${uuidv4()}`, // Temporary ID for UI
             name: newPlayerName,
             number: parseInt(newPlayerNumber),
             position: newPlayerPos || 'Jugadora'
@@ -1345,7 +1346,7 @@ const App = () => {
     // 2. Sync Players (jugadores)
     if (!teamError) {
         const dbPlayers = updatedTeam.players.map(p => ({
-            id: p.id.length < 10 ? undefined : p.id, 
+            id: p.id.startsWith('temp-') ? undefined : p.id,
             team_id: updatedTeam.id,
             nombre: p.name,      // CORREGIDO: antes enviaba 'name'
             numero: p.number,    // CORREGIDO: antes enviaba 'number'
