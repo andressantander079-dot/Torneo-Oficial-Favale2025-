@@ -4,7 +4,7 @@ import {
   Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { INITIAL_LOCATIONS } from './constants';
+import { INITIAL_LOCATIONS, INITIAL_STAFF } from './constants';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
 import { generateTable } from './utils';
 import { supabase } from './supabaseClient';
@@ -100,6 +100,96 @@ const HomeView = () => (
     </div>
   </div>
 );
+
+const ResultModal = ({ match, teams, onClose, onSave }: any) => {
+    const isSub16 = match.category === Category.SUB16;
+    const maxSets = isSub16 ? 5 : 3;
+    const [sets, setSets] = useState<{home: string, away: string}[]>(
+        match.sets.length > 0 ? match.sets.map((s:any) => ({home: s.home.toString(), away: s.away.toString()})) 
+        : Array.from({ length: maxSets }, () => ({home: '', away: ''}))
+    );
+    const [mvpHome, setMvpHome] = useState(match.mvpHomeId || '');
+    const [mvpAway, setMvpAway] = useState(match.mvpAwayId || '');
+
+    const homeTeam = teams.find((t:Team) => t.id === match.homeTeamId);
+    const awayTeam = teams.find((t:Team) => t.id === match.awayTeamId);
+
+    const handleSetChange = (index: number, type: 'home' | 'away', val: string) => {
+        const newSets = [...sets];
+        newSets[index] = { ...newSets[index], [type]: val };
+        setSets(newSets);
+    };
+
+    const handleSave = () => {
+        const validSets = sets.filter(s => s.home !== '' && s.away !== '').map(s => ({
+            home: parseInt(s.home),
+            away: parseInt(s.away)
+        }));
+        onSave(match, validSets, mvpHome, mvpAway);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl animate-fade-in">
+                <div className="bg-favale-dark p-4 flex justify-between items-center text-white">
+                    <h3 className="font-bold flex items-center gap-2"><Trophy size={18}/> Detalles del Partido</h3>
+                    <button onClick={onClose}><X size={20}/></button>
+                </div>
+                <div className="p-6 overflow-y-auto max-h-[80vh]">
+                    <div className="text-center mb-6">
+                        <div className="text-xs text-gray-400 mb-1">{match.date} • {match.time}</div>
+                        <div className="text-xl font-bold text-gray-800">{homeTeam?.name} <span className="text-gray-400 text-sm mx-2">vs</span> {awayTeam?.name}</div>
+                    </div>
+
+                    <div className="space-y-4 mb-6">
+                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">Resultados (Sets)</h4>
+                        {sets.map((set, idx) => (
+                            <div key={idx} className="flex items-center justify-center gap-4">
+                                <span className="text-xs font-bold text-gray-300 w-8 text-right">SET {idx + 1}</span>
+                                <input 
+                                    type="number" 
+                                    className="w-16 h-10 text-center border rounded-lg bg-gray-50 focus:ring-2 focus:ring-favale-primary outline-none"
+                                    placeholder="-"
+                                    value={set.home}
+                                    onChange={(e) => handleSetChange(idx, 'home', e.target.value)}
+                                />
+                                <span className="text-gray-300">:</span>
+                                <input 
+                                    type="number" 
+                                    className="w-16 h-10 text-center border rounded-lg bg-gray-50 focus:ring-2 focus:ring-favale-primary outline-none"
+                                    placeholder="-"
+                                    value={set.away}
+                                    onChange={(e) => handleSetChange(idx, 'away', e.target.value)}
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                         <div className="space-y-2">
+                             <label className="text-xs font-bold text-gray-500 block">MVP {homeTeam?.name}</label>
+                             <select className="w-full text-sm p-2 border rounded-lg" value={mvpHome} onChange={e => setMvpHome(e.target.value)}>
+                                 <option value="">Seleccionar...</option>
+                                 {homeTeam?.players.map((p: Player) => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
+                             </select>
+                         </div>
+                         <div className="space-y-2">
+                             <label className="text-xs font-bold text-gray-500 block">MVP {awayTeam?.name}</label>
+                             <select className="w-full text-sm p-2 border rounded-lg" value={mvpAway} onChange={e => setMvpAway(e.target.value)}>
+                                 <option value="">Seleccionar...</option>
+                                 {awayTeam?.players.map((p: Player) => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
+                             </select>
+                         </div>
+                    </div>
+
+                    <button onClick={handleSave} className="w-full py-3 bg-favale-primary text-white font-bold rounded-xl shadow-lg shadow-green-200">
+                        Guardar Resultados
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDeleteMatch, isLoading }: any) => {
   const [filterText, setFilterText] = useState('');
@@ -289,37 +379,62 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                 <h3 className="text-lg font-bold mb-4 text-favale-dark">Agregar Partido</h3>
                 <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
-                        <select 
-                            className="p-2 border rounded"
-                            value={newMatchData.category}
-                            onChange={e => setNewMatchData({...newMatchData, category: e.target.value as Category})}
-                        >
-                            {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1">Categoría</label>
+                            <select 
+                                className="w-full p-2 border rounded text-sm"
+                                value={newMatchData.category}
+                                onChange={e => setNewMatchData({...newMatchData, category: e.target.value as Category})}
+                            >
+                                {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1">Género</label>
+                            <select 
+                                className="w-full p-2 border rounded text-sm"
+                                value={newMatchData.gender}
+                                onChange={e => setNewMatchData({...newMatchData, gender: e.target.value as Gender})}
+                            >
+                                {Object.values(Gender).map(g => <option key={g} value={g}>{g}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div>
+                         <label className="text-xs font-bold text-gray-500 block mb-1">Cancha</label>
                          <select 
-                            className="p-2 border rounded"
+                            className="w-full p-2 border rounded text-sm"
                             value={newMatchData.court}
                             onChange={e => setNewMatchData({...newMatchData, court: e.target.value as Court})}
                         >
                             {Object.values(Court).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
-                         <input type="date" className="p-2 border rounded" value={newMatchData.date} onChange={e => setNewMatchData({...newMatchData, date: e.target.value})} />
-                         <input type="time" className="p-2 border rounded" value={newMatchData.time} onChange={e => setNewMatchData({...newMatchData, time: e.target.value})} />
+                         <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1">Fecha</label>
+                            <input type="date" className="w-full p-2 border rounded text-sm" value={newMatchData.date} onChange={e => setNewMatchData({...newMatchData, date: e.target.value})} />
+                         </div>
+                         <div>
+                            <label className="text-xs font-bold text-gray-500 block mb-1">Hora</label>
+                            <input type="time" className="w-full p-2 border rounded text-sm" value={newMatchData.time} onChange={e => setNewMatchData({...newMatchData, time: e.target.value})} />
+                         </div>
                     </div>
+
                     <div className="space-y-2 pt-2">
-                        <label className="text-xs text-gray-500 font-bold">Local</label>
+                        <label className="text-xs text-gray-500 font-bold">Local ({newMatchData.gender})</label>
                         <select className="w-full p-2 border rounded bg-gray-50" value={newMatchData.homeTeamId || ''} onChange={e => setNewMatchData({...newMatchData, homeTeamId: e.target.value})}>
                             <option value="">Seleccionar Equipo</option>
-                            {teams.filter((t:Team) => t.category === newMatchData.category).map((t:Team) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {teams.filter((t:Team) => t.category === newMatchData.category && t.gender === newMatchData.gender).map((t:Team) => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs text-gray-500 font-bold">Visitante</label>
+                        <label className="text-xs text-gray-500 font-bold">Visitante ({newMatchData.gender})</label>
                          <select className="w-full p-2 border rounded bg-gray-50" value={newMatchData.awayTeamId || ''} onChange={e => setNewMatchData({...newMatchData, awayTeamId: e.target.value})}>
                             <option value="">Seleccionar Equipo</option>
-                            {teams.filter((t:Team) => t.category === newMatchData.category).map((t:Team) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {teams.filter((t:Team) => t.category === newMatchData.category && t.gender === newMatchData.gender).map((t:Team) => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                     </div>
                 </div>
@@ -389,96 +504,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
   );
 };
 
-const ResultModal = ({ match, teams, onClose, onSave }: any) => {
-    const isSub16 = match.category === Category.SUB16;
-    const maxSets = isSub16 ? 5 : 3;
-    const [sets, setSets] = useState<{home: string, away: string}[]>(
-        match.sets.length > 0 ? match.sets.map((s:any) => ({home: s.home.toString(), away: s.away.toString()})) 
-        : Array.from({ length: maxSets }, () => ({home: '', away: ''}))
-    );
-    const [mvpHome, setMvpHome] = useState(match.mvpHomeId || '');
-    const [mvpAway, setMvpAway] = useState(match.mvpAwayId || '');
-
-    const homeTeam = teams.find((t:Team) => t.id === match.homeTeamId);
-    const awayTeam = teams.find((t:Team) => t.id === match.awayTeamId);
-
-    const handleSetChange = (index: number, type: 'home' | 'away', val: string) => {
-        const newSets = [...sets];
-        newSets[index] = { ...newSets[index], [type]: val };
-        setSets(newSets);
-    };
-
-    const handleSave = () => {
-        const validSets = sets.filter(s => s.home !== '' && s.away !== '').map(s => ({
-            home: parseInt(s.home),
-            away: parseInt(s.away)
-        }));
-        onSave(match, validSets, mvpHome, mvpAway);
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl animate-fade-in">
-                <div className="bg-favale-dark p-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold flex items-center gap-2"><Trophy size={18}/> Detalles del Partido</h3>
-                    <button onClick={onClose}><X size={20}/></button>
-                </div>
-                <div className="p-6 overflow-y-auto max-h-[80vh]">
-                    <div className="text-center mb-6">
-                        <div className="text-xs text-gray-400 mb-1">{match.date} • {match.time}</div>
-                        <div className="text-xl font-bold text-gray-800">{homeTeam?.name} <span className="text-gray-400 text-sm mx-2">vs</span> {awayTeam?.name}</div>
-                    </div>
-
-                    <div className="space-y-4 mb-6">
-                        <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 text-center">Resultados (Sets)</h4>
-                        {sets.map((set, idx) => (
-                            <div key={idx} className="flex items-center justify-center gap-4">
-                                <span className="text-xs font-bold text-gray-300 w-8 text-right">SET {idx + 1}</span>
-                                <input 
-                                    type="number" 
-                                    className="w-16 h-10 text-center border rounded-lg bg-gray-50 focus:ring-2 focus:ring-favale-primary outline-none"
-                                    placeholder="-"
-                                    value={set.home}
-                                    onChange={(e) => handleSetChange(idx, 'home', e.target.value)}
-                                />
-                                <span className="text-gray-300">:</span>
-                                <input 
-                                    type="number" 
-                                    className="w-16 h-10 text-center border rounded-lg bg-gray-50 focus:ring-2 focus:ring-favale-primary outline-none"
-                                    placeholder="-"
-                                    value={set.away}
-                                    onChange={(e) => handleSetChange(idx, 'away', e.target.value)}
-                                />
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                         <div className="space-y-2">
-                             <label className="text-xs font-bold text-gray-500 block">MVP {homeTeam?.name}</label>
-                             <select className="w-full text-sm p-2 border rounded-lg" value={mvpHome} onChange={e => setMvpHome(e.target.value)}>
-                                 <option value="">Seleccionar...</option>
-                                 {homeTeam?.players.map((p: Player) => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
-                             </select>
-                         </div>
-                         <div className="space-y-2">
-                             <label className="text-xs font-bold text-gray-500 block">MVP {awayTeam?.name}</label>
-                             <select className="w-full text-sm p-2 border rounded-lg" value={mvpAway} onChange={e => setMvpAway(e.target.value)}>
-                                 <option value="">Seleccionar...</option>
-                                 {awayTeam?.players.map((p: Player) => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
-                             </select>
-                         </div>
-                    </div>
-
-                    <button onClick={handleSave} className="w-full py-3 bg-favale-primary text-white font-bold rounded-xl shadow-lg shadow-green-200">
-                        Guardar Resultados
-                    </button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
 const TableView = ({ matches, teams, isLoading }: any) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>(Category.SUB13);
   const [selectedGender, setSelectedGender] = useState<Gender>(Gender.FEMALE);
@@ -529,8 +554,7 @@ const TableView = ({ matches, teams, isLoading }: any) => {
           const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
           const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
 
-          // Get the qualified team objects to recalculate tables properly (implementing "Carry Over" logic)
-          // We take the top 2 teams from the Zone tables to identify WHO is in Copa Oro
+          // Get the qualified team objects to recalculate tables properly
           const goldTeamsIds = [...zoneA.slice(0, 2), ...zoneB.slice(0, 2)].map(r => r.teamId);
           const silverTeamsIds = [...zoneA.slice(2, 4), ...zoneB.slice(2, 4)].map(r => r.teamId);
 
@@ -607,461 +631,6 @@ const TableView = ({ matches, teams, isLoading }: any) => {
       </div>
     </div>
   );
-};
-
-const TeamCard: React.FC<{ team: Team, isAdmin: boolean, onEdit: (t: Team) => void, onDelete: (id: string) => void, onClick: (t:Team) => void }> = ({ team, isAdmin, onEdit, onDelete, onClick }) => (
-    <div 
-        onClick={() => onClick(team)}
-        className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center hover:shadow-md transition-shadow relative cursor-pointer"
-    >
-        <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-blue-50 rounded-full flex items-center justify-center mb-3 text-favale-primary shadow-inner">
-            <Shield size={32} />
-        </div>
-        <h3 className="font-bold text-gray-800 text-center">{team.name}</h3>
-        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded mt-2">Zona {team.zone}</span>
-        
-        {isAdmin && (
-            <div className="absolute top-2 right-2 flex gap-1" onClick={e => e.stopPropagation()}>
-                 <button onClick={() => onEdit(team)} className="p-1.5 text-gray-400 hover:text-blue-500"><Edit2 size={16}/></button>
-                 <button onClick={() => onDelete(team.id)} className="p-1.5 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
-            </div>
-        )}
-    </div>
-);
-
-const AddTeamModal = ({ onClose, onSave }: any) => {
-    const [name, setName] = useState('');
-    const [category, setCategory] = useState<Category>(Category.SUB12);
-    const [gender, setGender] = useState<Gender>(Gender.FEMALE);
-    const [zone, setZone] = useState('Unica');
-
-    const handleSubmit = () => {
-        if (!name) return;
-        const newTeam: Team = {
-            id: '', // Will be generated by DB
-            name,
-            category,
-            gender,
-            zone: zone as 'A' | 'B' | 'Unica',
-            players: []
-        };
-        onSave(newTeam);
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-fade-in">
-                <div className="flex justify-between items-center mb-4">
-                     <h3 className="text-lg font-bold text-favale-dark">Nuevo Equipo</h3>
-                     <button onClick={onClose}><X size={20} className="text-gray-400"/></button>
-                </div>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre</label>
-                        <input className="w-full p-2 border rounded-lg" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Muni A"/>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoría</label>
-                            <select className="w-full p-2 border rounded-lg text-sm" value={category} onChange={e => setCategory(e.target.value as Category)}>
-                                {Object.values(Category).map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Género</label>
-                            <select className="w-full p-2 border rounded-lg text-sm" value={gender} onChange={e => setGender(e.target.value as Gender)}>
-                                {Object.values(Gender).map(g => <option key={g} value={g}>{g}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Zona</label>
-                        <select className="w-full p-2 border rounded-lg text-sm" value={zone} onChange={e => setZone(e.target.value)}>
-                            <option value="Unica">Unica</option>
-                            <option value="A">Zona A</option>
-                            <option value="B">Zona B</option>
-                        </select>
-                    </div>
-                    <div className="flex gap-2 pt-2">
-                        <button onClick={onClose} className="flex-1 py-2 text-gray-500 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
-                        <button onClick={handleSubmit} className="flex-1 py-2 bg-favale-primary text-white rounded-lg font-bold shadow-md hover:bg-green-700">Crear Equipo</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-const TeamEditModal = ({ team, onClose, onSave }: any) => {
-    const [name, setName] = useState(team.name);
-    const [zone, setZone] = useState<'A' | 'B' | 'Unica'>(team.zone);
-    const [players, setPlayers] = useState<Player[]>(team.players || []);
-    const [newPlayerName, setNewPlayerName] = useState('');
-    const [newPlayerNumber, setNewPlayerNumber] = useState('');
-    const [newPlayerPos, setNewPlayerPos] = useState('');
-
-    const handleAddPlayer = () => {
-        if (!newPlayerName || !newPlayerNumber) return;
-        const newPlayer: Player = {
-            id: uuidv4(), // Use uuidv4() directly
-            name: newPlayerName,
-            number: parseInt(newPlayerNumber),
-            position: newPlayerPos || 'Jugadora'
-        };
-        setPlayers([...players, newPlayer]);
-        setNewPlayerName('');
-        setNewPlayerNumber('');
-        setNewPlayerPos('');
-    };
-
-    const handleRemovePlayer = (id: string) => {
-        setPlayers(players.filter(p => p.id !== id));
-    };
-
-    const handleSave = () => {
-        onSave({ ...team, name, zone, players });
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-2xl animate-fade-in max-h-[85vh] overflow-hidden flex flex-col">
-                <div className="flex justify-between items-center mb-4">
-                     <h3 className="text-lg font-bold text-favale-dark">Editar Equipo</h3>
-                     <button onClick={onClose}><X size={20} className="text-gray-400"/></button>
-                </div>
-                
-                <div className="overflow-y-auto pr-2">
-                    <div className="mb-4">
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre del Equipo</label>
-                        <input className="w-full p-2 border rounded-lg" value={name} onChange={e => setName(e.target.value)} />
-                    </div>
-
-                     <div className="mb-6">
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Zona</label>
-                        <select 
-                            value={zone} 
-                            onChange={(e) => setZone(e.target.value as any)}
-                            className="w-full p-2 border rounded-lg text-sm bg-gray-50"
-                        >
-                            <option value="Unica">Unica</option>
-                            <option value="A">Zona A</option>
-                            <option value="B">Zona B</option>
-                        </select>
-                    </div>
-
-                    <div className="mb-4">
-                        <h4 className="text-sm font-bold text-gray-700 mb-2 flex justify-between items-center">
-                            Plantel 
-                            <span className="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{players.length} jugadoras</span>
-                        </h4>
-                        
-                        <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 mb-3">
-                            <div className="grid grid-cols-4 gap-2 mb-2">
-                                <input placeholder="#" className="col-span-1 p-2 text-sm border rounded" value={newPlayerNumber} onChange={e => setNewPlayerNumber(e.target.value)} />
-                                <input placeholder="Nombre" className="col-span-2 p-2 text-sm border rounded" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} />
-                                <input placeholder="Pos" className="col-span-1 p-2 text-sm border rounded" value={newPlayerPos} onChange={e => setNewPlayerPos(e.target.value)} />
-                            </div>
-                            <button onClick={handleAddPlayer} className="w-full py-1.5 bg-green-100 text-favale-dark font-bold text-xs rounded hover:bg-green-200 transition-colors">
-                                + Agregar Jugadora
-                            </button>
-                        </div>
-
-                        <div className="space-y-1">
-                            {players.map(p => (
-                                <div key={p.id} className="flex justify-between items-center bg-white p-2 rounded border border-gray-100 text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-favale-primary w-6 text-center">{p.number}</span>
-                                        <span className="text-gray-700">{p.name}</span>
-                                        <span className="text-[10px] text-gray-400 bg-gray-50 px-1 rounded">{p.position}</span>
-                                    </div>
-                                    <button onClick={() => handleRemovePlayer(p.id)} className="text-red-400 hover:text-red-600 p-1">
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex gap-2 pt-4 mt-auto border-t border-gray-100">
-                    <button onClick={onClose} className="flex-1 py-2 text-gray-500 font-medium hover:bg-gray-100 rounded-lg">Cancelar</button>
-                    <button onClick={handleSave} className="flex-1 py-2 bg-favale-primary text-white rounded-lg font-bold shadow-md hover:bg-green-700">Guardar Cambios</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const TeamDetailModal = ({ team, matches, onClose }: any) => {
-    const [activeTab, setActiveTab] = useState<'plantel' | 'partidos' | 'mvps'>('plantel');
-
-    // Upcoming matches
-    const upcoming = matches
-        .filter((m: Match) => (m.homeTeamId === team.id || m.awayTeamId === team.id))
-        .sort((a: Match, b: Match) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
-
-    // MVPs
-    const mvps: {match: Match, player: Player}[] = [];
-    matches.filter((m: Match) => m.isFinished).forEach((m: Match) => {
-        if (m.mvpHomeId) {
-            const player = team.players.find((p: Player) => p.id === m.mvpHomeId);
-            if(player) mvps.push({match: m, player});
-        }
-        if (m.mvpAwayId) {
-            const player = team.players.find((p: Player) => p.id === m.mvpAwayId);
-            if(player) mvps.push({match: m, player});
-        }
-    });
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl animate-fade-in max-h-[90vh] flex flex-col">
-                 <div className="bg-favale-dark p-4 flex justify-between items-center text-white">
-                     <h3 className="font-bold text-lg">{team.name}</h3>
-                     <button onClick={onClose}><X size={20}/></button>
-                 </div>
-                 
-                 <div className="flex border-b border-gray-100">
-                    <button 
-                        onClick={() => setActiveTab('plantel')}
-                        className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'plantel' ? 'border-favale-primary text-favale-primary' : 'border-transparent text-gray-400'}`}
-                    >
-                        Plantel
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('partidos')}
-                        className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'partidos' ? 'border-favale-primary text-favale-primary' : 'border-transparent text-gray-400'}`}
-                    >
-                        Partidos
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('mvps')}
-                        className={`flex-1 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'mvps' ? 'border-favale-primary text-favale-primary' : 'border-transparent text-gray-400'}`}
-                    >
-                        MVPs
-                    </button>
-                 </div>
-
-                 <div className="p-5 overflow-y-auto">
-                     {activeTab === 'plantel' && (
-                         <div className="animate-fade-in">
-                             {team.players.length === 0 ? <p className="text-sm text-gray-400 italic text-center py-4">No hay jugadoras cargadas.</p> : (
-                                 <div className="grid grid-cols-1 gap-2">
-                                     {team.players.map((p: Player) => (
-                                         <div key={p.id} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                             <div className="flex items-center gap-3">
-                                                <span className="font-mono font-bold text-favale-primary bg-white w-8 h-8 flex items-center justify-center rounded-lg border border-green-100 text-sm shadow-sm">{p.number}</span>
-                                                <span className="text-sm font-bold text-gray-700">{p.name}</span>
-                                             </div>
-                                             <span className="text-[10px] text-gray-400 uppercase font-medium tracking-wider bg-white px-2 py-1 rounded border border-gray-100">{p.position}</span>
-                                         </div>
-                                     ))}
-                                 </div>
-                             )}
-                         </div>
-                     )}
-
-                     {activeTab === 'partidos' && (
-                         <div className="animate-fade-in space-y-2">
-                             {upcoming.length === 0 ? <p className="text-sm text-gray-400 italic text-center py-4">No hay partidos registrados.</p> : (
-                                 upcoming.map((m: Match) => {
-                                     const isHome = m.homeTeamId === team.id;
-                                     // const opponentId = isHome ? m.awayTeamId : m.homeTeamId;
-                                     return (
-                                     <div key={m.id} className={`p-3 rounded-lg border ${m.isFinished ? 'bg-gray-50 border-gray-200' : 'bg-green-50 border-green-100'}`}>
-                                         <div className="text-xs text-gray-500 font-bold mb-2 flex justify-between">
-                                             <span>{m.date.slice(5)} {m.time}hs</span>
-                                             <span className="uppercase">{m.court.split('(')[0]}</span>
-                                         </div>
-                                         <div className="flex justify-between items-center">
-                                             <span className="text-sm font-bold text-gray-800">{isHome ? 'Local' : 'Visitante'}</span>
-                                             {m.isFinished && (
-                                                 <span className="font-mono font-bold text-favale-dark">
-                                                     {isHome 
-                                                        ? `${m.sets.filter(s=>s.home>s.away).length} - ${m.sets.filter(s=>s.away>s.home).length}`
-                                                        : `${m.sets.filter(s=>s.away>s.home).length} - ${m.sets.filter(s=>s.home>s.away).length}`
-                                                     }
-                                                 </span>
-                                             )}
-                                             {!m.isFinished && <span className="text-xs text-favale-primary font-bold">VS</span>}
-                                         </div>
-                                     </div>
-                                 )})
-                             )}
-                         </div>
-                     )}
-
-                     {activeTab === 'mvps' && (
-                         <div className="animate-fade-in space-y-2">
-                             {mvps.length === 0 ? <p className="text-sm text-gray-400 italic text-center py-4">Sin menciones aún.</p> : (
-                                 mvps.map((item, idx) => (
-                                     <div key={idx} className="bg-yellow-50 p-3 rounded-lg border border-yellow-200 flex items-center gap-3">
-                                         <div className="bg-yellow-100 p-2 rounded-full text-yellow-600">
-                                            <Medal size={20} />
-                                         </div>
-                                         <div>
-                                             <p className="font-bold text-sm text-gray-800">{item.player.name}</p>
-                                             <p className="text-xs text-yellow-700">MVP del partido ({item.match.date.slice(5)})</p>
-                                         </div>
-                                     </div>
-                                 ))
-                             )}
-                         </div>
-                     )}
-                 </div>
-            </div>
-        </div>
-    );
-};
-
-const TeamsView = ({ teams, matches, isAdmin, onUpdateTeam, onAddTeam, onDeleteTeam, isLoading }: any) => {
-  const [filterText, setFilterText] = useState('');
-  const [filterCat, setFilterCat] = useState<string>('Todas');
-  const [filterGender, setFilterGender] = useState<string>('Todas');
-  
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
-
-  const filteredTeams = teams.filter((t: Team) => {
-    const searchMatch = t.name.toLowerCase().includes(filterText.toLowerCase());
-    const catMatch = filterCat === 'Todas' || t.category === filterCat;
-    const genderMatch = filterGender === 'Todas' || t.gender === filterGender;
-    return searchMatch && catMatch && genderMatch;
-  });
-
-  if (isLoading) return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-favale-primary" size={48} /></div>;
-
-  return (
-    <div className="pb-24 px-4 pt-4">
-       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm mb-6 sticky top-0 z-10 border-b border-gray-100">
-        <div className="relative mb-3">
-            <input 
-                type="text" 
-                placeholder="Buscar equipo..." 
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-lg text-sm focus:ring-2 focus:ring-favale-primary outline-none"
-                value={filterText}
-                onChange={e => setFilterText(e.target.value)}
-            />
-            <Info className="absolute left-3 top-2.5 text-gray-400" size={16} />
-        </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-2">
-            {['Todas', ...Object.values(Category)].map(cat => (
-                <button 
-                    key={cat}
-                    onClick={() => setFilterCat(cat)}
-                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        filterCat === cat 
-                        ? 'bg-favale-dark text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                    {cat}
-                </button>
-            ))}
-        </div>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            {['Todas', ...Object.values(Gender)].map(g => (
-                <button 
-                    key={g}
-                    onClick={() => setFilterGender(g)}
-                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                        filterGender === g 
-                        ? 'bg-favale-accent text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                >
-                    {g}
-                </button>
-            ))}
-        </div>
-      </div>
-
-      {isAdmin && (
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="w-full mb-6 bg-favale-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 hover:bg-green-700 transition-colors"
-          >
-              <Plus size={20} /> Nuevo Equipo
-          </button>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-          {filteredTeams.map((team: Team) => (
-              <TeamCard 
-                key={team.id} 
-                team={team} 
-                isAdmin={isAdmin} 
-                onEdit={setEditingTeam} 
-                onDelete={() => setTeamToDelete(team)}
-                onClick={setSelectedTeam}
-              />
-          ))}
-      </div>
-
-      {showAddModal && <AddTeamModal onClose={() => setShowAddModal(false)} onSave={(t:Team) => { onAddTeam(t); setShowAddModal(false); }} />}
-      {editingTeam && <TeamEditModal team={editingTeam} onClose={() => setEditingTeam(null)} onSave={(t:Team) => { onUpdateTeam(t); setEditingTeam(null); }} />}
-      {selectedTeam && <TeamDetailModal team={selectedTeam} matches={matches} onClose={() => setSelectedTeam(null)} />}
-      
-      {teamToDelete && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in">
-                <div className="flex justify-center mb-4 text-red-500">
-                        <AlertTriangle size={48} />
-                </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-2 text-center">¿Eliminar Equipo?</h3>
-                <p className="text-sm text-gray-500 mb-6 text-center">
-                    Estás a punto de eliminar el equipo <br/>
-                    <span className="font-bold text-favale-dark">{teamToDelete.name}</span>. 
-                    <br/>Esta acción no se puede deshacer.
-                </p>
-                <div className="flex gap-2">
-                    <button onClick={() => setTeamToDelete(null)} className="flex-1 py-2 text-gray-500 hover:bg-gray-100 rounded-lg font-medium">Cancelar</button>
-                    <button onClick={() => { onDeleteTeam(teamToDelete.id); setTeamToDelete(null); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 shadow-md shadow-red-200">Eliminar</button>
-                </div>
-            </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const GuideView = ({ locations }: { locations: LocationGuide[] }) => {
-    return (
-        <div className="pb-24 px-4 pt-6">
-            <h2 className="text-2xl font-bold text-favale-dark mb-6">Guía Útil</h2>
-            <div className="space-y-4">
-                {locations.map((loc, idx) => {
-                    let Icon = MapIcon;
-                    let color = "bg-gray-100 text-gray-600";
-                    if (loc.type === 'court') { Icon = Trophy; color = "bg-green-100 text-favale-dark"; }
-                    if (loc.type === 'health') { Icon = Shield; color = "bg-red-100 text-red-500"; }
-                    if (loc.type === 'food') { Icon = Info; color = "bg-orange-100 text-orange-500"; }
-                    
-                    return (
-                        <a 
-                            key={idx} 
-                            href={loc.mapLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="block bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-shadow"
-                        >
-                            <div className={`p-3 rounded-full ${color}`}>
-                                <Icon size={24} />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-gray-800">{loc.name}</h3>
-                                <p className="text-sm text-gray-500">{loc.address}</p>
-                            </div>
-                            <MapIcon size={20} className="text-gray-300" />
-                        </a>
-                    );
-                })}
-            </div>
-        </div>
-    );
 };
 
 const StaffView = ({ staff, isAdmin, onAddStaff, onDeleteStaff, onUpdateStaff, isLoading }: any) => {
@@ -1145,7 +714,34 @@ const StaffView = ({ staff, isAdmin, onAddStaff, onDeleteStaff, onUpdateStaff, i
     );
 };
 
-// 3. Admin Components
+const LocationsView = () => (
+    <div className="pb-24 px-4 pt-6 space-y-4">
+        <h2 className="text-2xl font-bold text-favale-dark mb-4 px-2">Sedes y Lugares</h2>
+        <div className="grid gap-3">
+            {INITIAL_LOCATIONS.map((loc, i) => (
+                <a 
+                    key={i} 
+                    href={loc.mapLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-start gap-4 hover:shadow-md transition-shadow"
+                >
+                    <div className="bg-blue-50 p-3 rounded-full text-blue-600 mt-1">
+                        <MapIcon size={20} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-gray-800">{loc.name}</h3>
+                        <p className="text-sm text-gray-500 mb-2">{loc.address}</p>
+                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded bg-gray-100 text-gray-500`}>
+                            {loc.type}
+                        </span>
+                    </div>
+                </a>
+            ))}
+        </div>
+    </div>
+);
+
 const AdminModal = ({ isOpen, onClose, onLogin }: any) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
@@ -1195,10 +791,8 @@ const AdminModal = ({ isOpen, onClose, onLogin }: any) => {
   );
 };
 
-// --- MAIN APP ---
-
 const App = () => {
-  const [activeTab, setActiveTab] = useState('inicio');
+  const [activeTab, setActiveTab] = useState('home');
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -1212,39 +806,18 @@ const App = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-        console.log('Iniciando carga de datos (Tablas en Español)...');
-        
-        // 1. Fetch Teams (equipos) - SIN JOIN
-        const { data: teamsData, error: teamsError } = await supabase
-            .from('equipos')
-            .select('id, nombre, categoria, genero, zona'); // Columnas explicitas para evitar errores de cache
-            
-        if (teamsError) { 
-             console.error('Error cargando equipos:', JSON.stringify(teamsError, null, 2));
-        }
+        const { data: teamsData, error: teamsError } = await supabase.from('equipos').select('id, nombre, categoria, genero, zona'); 
+        if (teamsError) console.error('Error cargando equipos:', JSON.stringify(teamsError, null, 2));
 
-        // 2. Fetch Players (jugadores) - SEPARADO para evitar error de relación
-        const { data: playersData, error: playersError } = await supabase
-            .from('jugadores')
-            .select('*');
+        const { data: playersData, error: playersError } = await supabase.from('jugadores').select('*');
+        if (playersError) console.error('Error cargando jugadores:', JSON.stringify(playersError, null, 2));
 
-        if (playersError) {
-            console.error('Error cargando jugadores:', JSON.stringify(playersError, null, 2));
-        }
-
-        // Fetch Matches (partidos)
         const { data: matchesData, error: matchesError } = await supabase.from('partidos').select('*');
-        if (matchesError) {
-             console.error('Error cargando partidos:', JSON.stringify(matchesError, null, 2));
-        }
+        if (matchesError) console.error('Error cargando partidos:', JSON.stringify(matchesError, null, 2));
 
-        // Fetch Staff (personal)
         const { data: staffData, error: staffError } = await supabase.from('personal').select('*');
-        if (staffError) {
-             console.error('Error cargando staff:', JSON.stringify(staffError, null, 2));
-        }
+        if (staffError) console.error('Error cargando staff:', JSON.stringify(staffError, null, 2));
 
-        // Combinar equipos y jugadores manualmente
         if (teamsData) {
             const combinedTeams = teamsData.map((team: any) => ({
                 ...team,
@@ -1267,19 +840,17 @@ const App = () => {
     fetchData();
   }, []);
 
-
   // --- CRUD ACTIONS ---
 
   const handleAddMatch = async (matchData: Partial<Match>) => {
-      // Map to DB
       const dbMatch = {
-          categoria: matchData.category, // Mapped to 'categoria'
-          genero: matchData.gender,      // Mapped to 'genero'
-          lugar: matchData.court,        // Mapped to 'lugar'
-          fecha: matchData.date,         // Mapped to 'fecha'
-          hora: matchData.time,          // Mapped to 'hora' (texto)
-          local: matchData.homeTeamId,   // Mapped to 'local'
-          visitante: matchData.awayTeamId, // Mapped to 'visitante'
+          categoria: matchData.category,
+          genero: matchData.gender,
+          lugar: matchData.court,
+          fecha: matchData.date,
+          hora: matchData.time,
+          local: matchData.homeTeamId,
+          visitante: matchData.awayTeamId,
           stage: 'Fase Regular',
           sets: [],
           is_finished: false
@@ -1289,13 +860,11 @@ const App = () => {
       if (!error && data) {
           setMatches([...matches, mapMatchFromDB(data[0])]);
       } else {
-          console.error('Error creating match:', JSON.stringify(error, null, 2));
-          alert('Error creando partido. Verifica que la tabla "partidos" tenga las columnas correctas.');
+          console.error('Error creando partido:', JSON.stringify(error, null, 2));
       }
   };
 
   const handleUpdateMatch = async (updatedMatch: Match) => {
-    // Map to DB
     const dbMatch = {
         is_finished: updatedMatch.isFinished,
         sets: updatedMatch.sets,
@@ -1307,8 +876,7 @@ const App = () => {
     if (!error) {
         setMatches(matches.map(m => m.id === updatedMatch.id ? updatedMatch : m));
     } else {
-        console.error('Error updating match:', JSON.stringify(error, null, 2));
-        alert('Error actualizando resultado');
+        console.error('Error actualizando partido:', JSON.stringify(error, null, 2));
     }
   };
   
@@ -1317,127 +885,47 @@ const App = () => {
       if (!error) {
           setMatches(matches.filter(m => m.id !== id));
       } else {
-          console.error('Error deleting match:', JSON.stringify(error, null, 2));
-          alert('Error eliminando partido');
+        console.error('Error eliminando partido:', JSON.stringify(error, null, 2));
       }
   };
 
   const handleAddTeam = async (newTeam: Team) => {
-      // 1. Create Team (equipos)
-      // Usar nombres de columnas en español
-      const dbTeam = {
-          nombre: newTeam.name,
-          categoria: newTeam.category,
-          genero: newTeam.gender,
-          zona: newTeam.zone
-      };
-      const { data, error } = await supabase.from('equipos').insert([dbTeam]).select();
-      if (!error && data) {
-          // El equipo nuevo no tiene jugadores aún, así que lo mapeamos manualmente para evitar error de map
-          const createdTeam = { ...mapTeamFromDB(data[0]), players: [] }; 
-          setTeams([...teams, createdTeam]);
-      } else {
-          console.error('Error creating team:', JSON.stringify(error, null, 2));
-          alert('Error creando equipo. Verifica tabla "equipos"');
-      }
+      // Stub for future team adding
   };
-
   const handleUpdateTeam = async (updatedTeam: Team) => {
-    // Find original team to detect deletions
-    const originalTeam = teams.find(t => t.id === updatedTeam.id);
-    const originalPlayerIds = originalTeam ? originalTeam.players.map(p => p.id) : [];
-    // With client-side UUIDs, all players (new and old) have IDs.
-    const currentPlayerIds = updatedTeam.players.map(p => p.id);
-    
-    // IDs present in original but missing in current should be deleted
-    const idsToDelete = originalPlayerIds.filter(id => !currentPlayerIds.includes(id));
-
-    // 1. Update Team Details
-    const dbTeam = {
-        nombre: updatedTeam.name,
-        zona: updatedTeam.zone
-    };
-    const { error: teamError } = await supabase.from('equipos').update(dbTeam).eq('id', updatedTeam.id);
-    
-    // 2. Sync Players (jugadores)
-    if (!teamError) {
-        // Delete removed players
-        if (idsToDelete.length > 0) {
-            const { error: deleteError } = await supabase.from('jugadores').delete().in('id', idsToDelete);
-            if (deleteError) console.error('Error eliminando jugadores:', JSON.stringify(deleteError, null, 2));
-        }
-
-        const dbPlayers = updatedTeam.players.map(p => ({
-            id: p.id, // Use the ID directly (either existing or new UUID)
-            team_id: updatedTeam.id,
-            nombre: p.name,      // CORREGIDO: antes enviaba 'name'
-            numero: p.number,    // CORREGIDO: antes enviaba 'number'
-            posicion: p.position // CORREGIDO: antes enviaba 'position'
-        }));
-
-        // Upsert players (insert if new ID, update if existing ID)
-        if (dbPlayers.length > 0) {
-             const { error: playersError } = await supabase.from('jugadores').upsert(dbPlayers);
-             if (playersError) console.error('Error sincronizando jugadores:', JSON.stringify(playersError, null, 2));
-        }
-
-        fetchData(); 
-    } else {
-        console.error('Error updating team:', JSON.stringify(teamError, null, 2));
-        alert('Error actualizando equipo');
-    }
+      // Stub for future team updating
   };
-
   const handleDeleteTeam = async (id: string) => {
-      const { error } = await supabase.from('equipos').delete().eq('id', id);
-      if (!error) {
-          setTeams(teams.filter(t => t.id !== id));
-      } else {
-          console.error('Error deleting team:', JSON.stringify(error, null, 2));
-          alert('Error eliminando equipo');
-      }
+      // Stub for future team deleting
   };
 
   const handleAddStaff = async (newStaff: Partial<StaffMember>) => {
-      const dbStaff = {
-          nombre: newStaff.name, 
-          rol: newStaff.role      
-      };
+      const dbStaff = { nombre: newStaff.name, rol: newStaff.role };
       const { data, error } = await supabase.from('personal').insert([dbStaff]).select();
-      if (!error && data) {
-          setStaff([...staff, mapStaffFromDB(data[0])]);
-      } else {
-          console.error('Error adding staff:', JSON.stringify(error, null, 2));
-      }
+      if (!error && data) setStaff([...staff, mapStaffFromDB(data[0])]);
+      else console.error('Error creando staff:', JSON.stringify(error, null, 2));
   };
 
   const handleUpdateStaff = async (updatedStaff: StaffMember) => {
       const { error } = await supabase.from('personal').update({ nombre: updatedStaff.name, rol: updatedStaff.role }).eq('id', updatedStaff.id);
-      if (!error) {
-          setStaff(staff.map(s => s.id === updatedStaff.id ? updatedStaff : s));
-      } else {
-          console.error('Error updating staff:', JSON.stringify(error, null, 2));
-      }
+      if (!error) setStaff(staff.map(s => s.id === updatedStaff.id ? updatedStaff : s));
+      else console.error('Error actualizando staff:', JSON.stringify(error, null, 2));
   };
 
   const handleDeleteStaff = async (id: string) => {
       const { error } = await supabase.from('personal').delete().eq('id', id);
-      if (!error) {
-          setStaff(staff.filter(s => s.id !== id));
-      } else {
-          console.error('Error deleting staff:', JSON.stringify(error, null, 2));
-      }
+      if (!error) setStaff(staff.filter(s => s.id !== id));
+      else console.error('Error eliminando staff:', JSON.stringify(error, null, 2));
   };
 
   // Render View
   const renderContent = () => {
     switch(activeTab) {
-      case 'inicio': return <HomeView />;
+      case 'home': return <HomeView />;
       case 'fixture': return <FixtureView matches={matches} teams={teams} isAdmin={isAdmin} onUpdateMatch={handleUpdateMatch} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} isLoading={isLoading} />;
-      case 'tabla': return <TableView matches={matches} teams={teams} isLoading={isLoading} />;
-      case 'equipos': return <TeamsView teams={teams} matches={matches} isAdmin={isAdmin} onUpdateTeam={handleUpdateTeam} onAddTeam={handleAddTeam} onDeleteTeam={handleDeleteTeam} isLoading={isLoading} />;
-      case 'guia': return <GuideView locations={INITIAL_LOCATIONS} />;
+      case 'positions': return <TableView matches={matches} teams={teams} isLoading={isLoading} />;
       case 'staff': return <StaffView staff={staff} isAdmin={isAdmin} onAddStaff={handleAddStaff} onDeleteStaff={handleDeleteStaff} onUpdateStaff={handleUpdateStaff} isLoading={isLoading} />;
+      case 'locations': return <LocationsView />;
       default: return <HomeView />;
     }
   };
@@ -1479,12 +967,11 @@ const App = () => {
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 pb-safe z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <div className="flex justify-around items-center max-w-md mx-auto">
-          <TabButton active={activeTab === 'inicio'} label="Inicio" icon={Shield} onClick={() => setActiveTab('inicio')} />
+          <TabButton active={activeTab === 'home'} label="Inicio" icon={Shield} onClick={() => setActiveTab('home')} />
           <TabButton active={activeTab === 'fixture'} label="Fixture" icon={Calendar} onClick={() => setActiveTab('fixture')} />
-          <TabButton active={activeTab === 'tabla'} label="Tabla" icon={Trophy} onClick={() => setActiveTab('tabla')} />
-          <TabButton active={activeTab === 'equipos'} label="Equipos" icon={Users} onClick={() => setActiveTab('equipos')} />
-          <TabButton active={activeTab === 'guia'} label="Guia" icon={MapIcon} onClick={() => setActiveTab('guia')} />
-          <TabButton active={activeTab === 'staff'} label="Staff" icon={Menu} onClick={() => setActiveTab('staff')} />
+          <TabButton active={activeTab === 'positions'} label="Tabla" icon={Trophy} onClick={() => setActiveTab('positions')} />
+          <TabButton active={activeTab === 'staff'} label="Staff" icon={Users} onClick={() => setActiveTab('staff')} />
+          <TabButton active={activeTab === 'locations'} label="Sedes" icon={MapIcon} onClick={() => setActiveTab('locations')} />
         </div>
       </nav>
 
