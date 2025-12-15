@@ -28,15 +28,15 @@ const mapTeamFromDB = (t: any): Team => ({
 
 const mapMatchFromDB = (m: any): Match => ({
     id: m.id,
-    date: m.date,
-    time: m.time ? m.time.slice(0, 5) : '00:00', // HH:MM:SS -> HH:MM
-    court: m.court,
-    category: m.category,
-    gender: m.gender,
-    homeTeamId: m.home_team_id,
-    awayTeamId: m.away_team_id,
+    date: m.fecha, // Mapped from 'fecha'
+    time: m.hora ? m.hora.slice(0, 5) : '00:00', // Mapped from 'hora'
+    court: m.lugar, // Mapped from 'lugar'
+    category: m.categoria, // Mapped from 'categoria'
+    gender: m.genero, // Mapped from 'genero'
+    homeTeamId: m.local, // Mapped from 'local'
+    awayTeamId: m.visitante, // Mapped from 'visitante'
     isFinished: m.is_finished,
-    sets: m.sets || [], // JSONB returns as object/array
+    sets: m.sets || [], 
     mvpHomeId: m.mvp_home_id,
     mvpAwayId: m.mvp_away_id,
     stage: m.stage
@@ -44,8 +44,8 @@ const mapMatchFromDB = (m: any): Match => ({
 
 const mapStaffFromDB = (s: any): StaffMember => ({
     id: s.id,
-    name: s.name,
-    role: s.role
+    name: s.nombre, // Mapped from 'nombre'
+    role: s.rol // Mapped from 'rol'
 });
 
 // --- COMPONENTS ---
@@ -1256,13 +1256,13 @@ const App = () => {
   const handleAddMatch = async (matchData: Partial<Match>) => {
       // Map to DB
       const dbMatch = {
-          category: matchData.category,
-          gender: matchData.gender,
-          court: matchData.court,
-          date: matchData.date,
-          time: matchData.time,
-          home_team_id: matchData.homeTeamId,
-          away_team_id: matchData.awayTeamId,
+          categoria: matchData.category, // Mapped to 'categoria'
+          genero: matchData.gender, // Mapped to 'genero'
+          lugar: matchData.court, // Mapped to 'lugar'
+          fecha: matchData.date, // Mapped to 'fecha'
+          hora: matchData.time, // Mapped to 'hora'
+          local: matchData.homeTeamId, // Mapped to 'local'
+          visitante: matchData.awayTeamId, // Mapped to 'visitante'
           stage: 'Fase Regular',
           sets: [],
           is_finished: false
@@ -1363,14 +1363,18 @@ const App = () => {
   };
 
   const handleAddStaff = async (newStaff: Partial<StaffMember>) => {
-      const { data, error } = await supabase.from('personal').insert([newStaff]).select();
+      const dbStaff = {
+          nombre: newStaff.name, // Mapped to 'nombre'
+          rol: newStaff.role     // Mapped to 'rol'
+      };
+      const { data, error } = await supabase.from('personal').insert([dbStaff]).select();
       if (!error && data) {
           setStaff([...staff, mapStaffFromDB(data[0])]);
       }
   };
 
   const handleUpdateStaff = async (updatedStaff: StaffMember) => {
-      const { error } = await supabase.from('personal').update({ name: updatedStaff.name, role: updatedStaff.role }).eq('id', updatedStaff.id);
+      const { error } = await supabase.from('personal').update({ nombre: updatedStaff.name, rol: updatedStaff.role }).eq('id', updatedStaff.id);
       if (!error) {
           setStaff(staff.map(s => s.id === updatedStaff.id ? updatedStaff : s));
       }
