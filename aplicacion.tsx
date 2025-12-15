@@ -524,7 +524,8 @@ const TableView = ({ matches, teams, isLoading }: any) => {
 
   // Determine what to render based on category logic
   const renderContent = () => {
-      if (selectedCategory === Category.SUB13) {
+      // Sub 13 Femenino mantiene formato de Zonas y Copas
+      if (selectedCategory === Category.SUB13 && selectedGender === Gender.FEMALE) {
           const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
           const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
 
@@ -559,7 +560,7 @@ const TableView = ({ matches, teams, isLoading }: any) => {
               </>
           );
       } else {
-          // Sub 12 and 16 are usually Single Zone (Unica) or simple structure for this demo
+          // Sub 12, Sub 16 y Sub 13 Masculino usan Tabla General
           const table = generateTable(matches, genderTeams, selectedCategory);
           return <RenderTableBlock title="Tabla General" data={table} />;
       }
