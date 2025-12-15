@@ -36,8 +36,8 @@ const mapMatchFromDB = (m: any): Match => ({
     awayTeamId: m.visitante,
     isFinished: m.is_finished,
     sets: typeof m.sets === 'string' ? JSON.parse(m.sets) : (m.sets || []),
-    mvpHomeId: m.mvp_home_id,
-    mvpAwayId: m.mvp_away_id,
+    mvpHomeId: m.mvp_local,
+    mvpAwayId: m.mvp_visitante,
     stage: 'Fase Regular'
 });
 
@@ -868,8 +868,8 @@ const App = () => {
     const dbMatch = {
         is_finished: updatedMatch.isFinished,
         sets: updatedMatch.sets,
-        mvp_home_id: updatedMatch.mvpHomeId,
-        mvp_away_id: updatedMatch.mvpAwayId
+        mvp_local: updatedMatch.mvpHomeId,
+        mvp_visitante: updatedMatch.mvpAwayId
     };
 
     const { error } = await supabase.from('partidos').update(dbMatch).eq('id', updatedMatch.id);
