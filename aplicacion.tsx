@@ -52,10 +52,10 @@ const TabButton = ({ active, label, icon: Icon, onClick }: any) => (
   <button 
     onClick={onClick}
     className={`flex flex-col items-center justify-center w-full py-3 transition-all ${
-      active ? 'text-white font-bold scale-105' : 'text-green-300 hover:text-green-100'
+      active ? 'text-favale-dark font-black scale-105' : 'text-gray-400 hover:text-favale-primary'
     }`}
   >
-    <div className={`p-1 rounded-full ${active ? 'bg-white/10' : ''}`}>
+    <div className={`p-1 rounded-full ${active ? 'bg-green-100' : 'bg-transparent'}`}>
         <Icon size={20} strokeWidth={active ? 2.5 : 2} />
     </div>
     <span className="text-[9px] mt-1 uppercase tracking-wide">{label}</span>
@@ -1331,7 +1331,7 @@ const App = () => {
         </main>
 
         {/* Bottom Nav */}
-        <nav className="fixed bottom-0 w-full bg-favale-dark border-t border-green-800 px-2 pb-safe pt-2 z-50 shadow-lg">
+        <nav className="fixed bottom-0 w-full bg-white border-t border-gray-200 px-2 pb-safe pt-2 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
              <div className="flex justify-around items-center max-w-md mx-auto">
                  <TabButton active={activeTab === 'home'} label="Inicio" icon={Star} onClick={() => setActiveTab('home')} />
                  <TabButton active={activeTab === 'teams'} label="Equipos" icon={Shield} onClick={() => setActiveTab('teams')} />
