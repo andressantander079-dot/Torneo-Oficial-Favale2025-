@@ -17,7 +17,7 @@ const mapTeamFromDB = (t: any): Team => ({
     category: t.categoria,   // Base de datos: categoria
     gender: t.genero,        // Base de datos: genero
     zone: t.zona,            // Base de datos: zona
-    // Mapeo de jugadores
+    // Mapeo de jugadores (Asegúrate de que la tabla 'jugadores' tenga: nombre, numero, posicion)
     players: t.jugadores ? t.jugadores.map((p: any) => ({
         id: p.id,
         name: p.nombre,      // Base de datos: nombre
@@ -28,24 +28,24 @@ const mapTeamFromDB = (t: any): Team => ({
 
 const mapMatchFromDB = (m: any): Match => ({
     id: m.id,
-    date: m.fecha,           // Base de datos: fecha
-    time: m.hora ? m.hora.slice(0, 5) : '00:00', // Base de datos: hora
-    court: m.lugar,          // Base de datos: lugar
-    category: m.categoria,   // Base de datos: categoria
-    gender: m.genero,        // Base de datos: genero
-    homeTeamId: m.local,     // Base de datos: local
-    awayTeamId: m.visitante, // Base de datos: visitante
-    isFinished: m.is_finished,
-    sets: m.sets || [], 
-    mvpHomeId: m.mvp_home_id,
-    mvpAwayId: m.mvp_away_id,
+    date: m.fecha,            // Base de datos: fecha
+    time: m.hora ? m.hora.slice(0, 5) : '00:00', // Base de datos: hora (texto)
+    court: m.lugar,           // Base de datos: lugar
+    category: m.categoria,    // Base de datos: categoria
+    gender: m.genero,         // Base de datos: genero
+    homeTeamId: m.local,      // Base de datos: local
+    awayTeamId: m.visitante,  // Base de datos: visitante
+    isFinished: m.is_finished, // Base de datos: is_finished (booleano)
+    sets: m.sets || [],       // Base de datos: sets (json)
+    mvpHomeId: m.mvp_home_id, // Base de datos: mvp_home_id
+    mvpAwayId: m.mvp_away_id, // Base de datos: mvp_away_id
     stage: m.stage
 });
 
 const mapStaffFromDB = (s: any): StaffMember => ({
     id: s.id,
-    name: s.nombre,          // Base de datos: nombre
-    role: s.rol              // Base de datos: rol
+    name: s.nombre,           // Base de datos: nombre
+    role: s.rol               // Base de datos: rol
 });
 
 // --- COMPONENTS ---
@@ -1118,7 +1118,7 @@ const StaffView = ({ staff, isAdmin, onAddStaff, onDeleteStaff, onUpdateStaff, i
                                     <button onClick={() => handleUpdate(s.id)} className="text-xs text-green-600 font-bold">Guardar</button>
                                 </div>
                              </div>
-                         ) : (
+                          ) : (
                              <>
                                 <div>
                                     <h3 className="font-bold text-gray-800">{s.name}</h3>
@@ -1131,7 +1131,7 @@ const StaffView = ({ staff, isAdmin, onAddStaff, onDeleteStaff, onUpdateStaff, i
                                     </div>
                                 )}
                              </>
-                         )}
+                          )}
                     </div>
                 ))}
             </div>
@@ -1208,38 +1208,50 @@ const App = () => {
     try {
         console.log('Iniciando carga de datos (Tablas en Español)...');
         
-        // Fetch Teams & Players (equipos & jugadores)
+        // 1. Fetch Teams (equipos) - SIN JOIN
         const { data: teamsData, error: teamsError } = await supabase
             .from('equipos')
-            .select(`*, jugadores!inner(*)`);
+            .select('*');
             
-        if (teamsError) {
-             console.error('Error cargando equipos:', teamsError);
-             throw new Error(`Error en tabla 'equipos': ${teamsError.message}`);
+        if (teamsError) { 
+             console.error('Error cargando equipos:', teamsError.message || teamsError);
+        }
+
+        // 2. Fetch Players (jugadores) - SEPARADO para evitar error de relación
+        const { data: playersData, error: playersError } = await supabase
+            .from('jugadores')
+            .select('*');
+
+        if (playersError) {
+            console.error('Error cargando jugadores:', playersError.message || playersError);
         }
 
         // Fetch Matches (partidos)
         const { data: matchesData, error: matchesError } = await supabase.from('partidos').select('*');
         if (matchesError) {
-             console.error('Error cargando partidos:', matchesError);
-             throw new Error(`Error en tabla 'partidos': ${matchesError.message}`);
+             console.error('Error cargando partidos:', matchesError.message || matchesError);
         }
 
         // Fetch Staff (personal)
         const { data: staffData, error: staffError } = await supabase.from('personal').select('*');
         if (staffError) {
-             console.error('Error cargando staff:', staffError);
-             throw new Error(`Error en tabla 'personal': ${staffError.message}`);
+             console.error('Error cargando staff:', staffError.message || staffError);
         }
 
-        if (teamsData) setTeams(teamsData.map(mapTeamFromDB));
+        // Combinar equipos y jugadores manualmente
+        if (teamsData) {
+            const combinedTeams = teamsData.map((team: any) => ({
+                ...team,
+                jugadores: playersData ? playersData.filter((p: any) => p.team_id === team.id) : []
+            }));
+            setTeams(combinedTeams.map(mapTeamFromDB));
+        }
+        
         if (matchesData) setMatches(matchesData.map(mapMatchFromDB));
         if (staffData) setStaff(staffData.map(mapStaffFromDB));
 
     } catch (error: any) {
-        console.error('Error crítico en carga:', error);
-        const msg = error.message || JSON.stringify(error);
-        alert(`Ocurrió un error al cargar los datos:\n${msg}\n\nPor favor, verifica que las tablas 'equipos', 'jugadores', 'partidos', 'personal' existan en Supabase.`);
+        console.error('Error crítico en carga:', error.message || error);
     } finally {
         setIsLoading(false);
     }
@@ -1256,11 +1268,11 @@ const App = () => {
       // Map to DB
       const dbMatch = {
           categoria: matchData.category, // Mapped to 'categoria'
-          genero: matchData.gender, // Mapped to 'genero'
-          lugar: matchData.court, // Mapped to 'lugar'
-          fecha: matchData.date, // Mapped to 'fecha'
-          hora: matchData.time, // Mapped to 'hora'
-          local: matchData.homeTeamId, // Mapped to 'local'
+          genero: matchData.gender,      // Mapped to 'genero'
+          lugar: matchData.court,        // Mapped to 'lugar'
+          fecha: matchData.date,         // Mapped to 'fecha'
+          hora: matchData.time,          // Mapped to 'hora' (texto)
+          local: matchData.homeTeamId,   // Mapped to 'local'
           visitante: matchData.awayTeamId, // Mapped to 'visitante'
           stage: 'Fase Regular',
           sets: [],
@@ -1271,7 +1283,8 @@ const App = () => {
       if (!error && data) {
           setMatches([...matches, mapMatchFromDB(data[0])]);
       } else {
-          alert('Error creando partido (Tabla partidos)');
+          console.error(error);
+          alert('Error creando partido. Verifica que la tabla "partidos" tenga las columnas: categoria, genero, is_finished, sets');
       }
   };
 
@@ -1312,17 +1325,17 @@ const App = () => {
       };
       const { data, error } = await supabase.from('equipos').insert([dbTeam]).select();
       if (!error && data) {
-          const createdTeam = mapTeamFromDB(data[0]);
+          // El equipo nuevo no tiene jugadores aún, así que lo mapeamos manualmente para evitar error de map
+          const createdTeam = { ...mapTeamFromDB(data[0]), players: [] }; 
           setTeams([...teams, createdTeam]);
       } else {
           console.error(error);
-          alert('Error creando equipo (Tabla equipos)');
+          alert('Error creando equipo. Verifica tabla "equipos"');
       }
   };
 
   const handleUpdateTeam = async (updatedTeam: Team) => {
     // 1. Update Team Details
-    // Usar nombres de columnas en español
     const dbTeam = {
         nombre: updatedTeam.name,
         zona: updatedTeam.zone
@@ -1332,20 +1345,19 @@ const App = () => {
     // 2. Sync Players (jugadores)
     if (!teamError) {
         const dbPlayers = updatedTeam.players.map(p => ({
-            id: p.id.length < 10 ? undefined : p.id, // If temp ID (Math.random), let DB gen ID
+            id: p.id.length < 10 ? undefined : p.id, 
             team_id: updatedTeam.id,
-            name: p.name,
-            number: p.number,
-            position: p.position
+            nombre: p.name,      // CORREGIDO: antes enviaba 'name'
+            numero: p.number,    // CORREGIDO: antes enviaba 'number'
+            posicion: p.position // CORREGIDO: antes enviaba 'position'
         }));
 
         // Upsert players
         if (dbPlayers.length > 0) {
              const { error: playersError } = await supabase.from('jugadores').upsert(dbPlayers);
-             if (playersError) console.error('Error syncing players', playersError);
+             if (playersError) console.error('Error sincronizando jugadores:', playersError);
         }
 
-        // Refresh Data to get correct IDs
         fetchData(); 
     } else {
         alert('Error actualizando equipo');
@@ -1363,8 +1375,8 @@ const App = () => {
 
   const handleAddStaff = async (newStaff: Partial<StaffMember>) => {
       const dbStaff = {
-          nombre: newStaff.name, // Mapped to 'nombre'
-          rol: newStaff.role     // Mapped to 'rol'
+          nombre: newStaff.name, 
+          rol: newStaff.role      
       };
       const { data, error } = await supabase.from('personal').insert([dbStaff]).select();
       if (!error && data) {
