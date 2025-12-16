@@ -67,7 +67,7 @@ const HomeView = () => (
     <div className="bg-gradient-to-br from-favale-dark to-favale-primary text-white p-6 rounded-3xl shadow-xl mx-4 mt-4">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight mb-2">USHUAIA 2025</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight mb-2">USHUAIA 2026</h1>
           <p className="text-green-100 text-sm font-medium uppercase tracking-wider">Fin del Mundo</p>
         </div>
         <Trophy className="text-yellow-400 opacity-80" size={40} />
