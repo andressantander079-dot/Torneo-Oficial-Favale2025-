@@ -46,7 +46,10 @@ export const generateTable = (matches: Match[], teams: Team[], category: Categor
       points: 0,
       setsWon: 0,
       setsLost: 0,
-      pointsRatio: 0
+      pointsRatio: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      pointsDiff: 0
     };
   });
 
@@ -59,12 +62,17 @@ export const generateTable = (matches: Match[], teams: Team[], category: Categor
     // Important for cross-zone matches or playoffs if we only want group stage table
     if (!homeStats || !awayStats) return;
 
-    // Count Sets
+    // Count Sets and Points
     let homeSets = 0;
     let awaySets = 0;
+    let homePoints = 0;
+    let awayPoints = 0;
+
     match.sets.forEach(s => {
       if (s.home > s.away) homeSets++;
       else awaySets++;
+      homePoints += s.home;
+      awayPoints += s.away;
     });
 
     // Update played
@@ -86,15 +94,25 @@ export const generateTable = (matches: Match[], teams: Team[], category: Categor
       homeStats.lost++;
     }
 
+    // Update Set Points stats (Paf, PeC, Dif)
+    homeStats.pointsFor += homePoints;
+    homeStats.pointsAgainst += awayPoints;
+    homeStats.pointsDiff = homeStats.pointsFor - homeStats.pointsAgainst;
+
+    awayStats.pointsFor += awayPoints;
+    awayStats.pointsAgainst += homePoints;
+    awayStats.pointsDiff = awayStats.pointsFor - awayStats.pointsAgainst;
+
     // Update Points
     const points = calculatePoints(category, homeSets, awaySets);
     homeStats.points += points.home;
     awayStats.points += points.away;
   });
 
-  // Sort: Points DESC, then Sets Ratio (simplified to Sets Won for this demo), then Name
+  // Sort: Points DESC, then Points Diff (Dif), then Sets Ratio (simplified to Sets Won for this demo), then Name
   return Object.values(table).sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
+    if (b.pointsDiff !== a.pointsDiff) return b.pointsDiff - a.pointsDiff;
     if ((b.setsWon - b.setsLost) !== (a.setsWon - a.setsLost)) return (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost);
     return a.teamName.localeCompare(b.teamName);
   });

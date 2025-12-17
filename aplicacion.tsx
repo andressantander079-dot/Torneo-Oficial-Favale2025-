@@ -923,9 +923,12 @@ const PositionsView = ({ teams, matches }: any) => {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-[10px] uppercase tracking-wider text-center">
                         <tr>
-                            <th className="px-3 py-3 text-left w-1/2">Equipo</th>
-                            <th className="px-2 py-3">PJ</th>
-                            <th className="px-2 py-3">PG</th>
+                            <th className="px-3 py-3 text-left w-1/3">Equipo</th>
+                            <th className="px-1 py-3">PJ</th>
+                            <th className="px-1 py-3">PG</th>
+                            <th className="px-1 py-3">PaF</th>
+                            <th className="px-1 py-3">PeC</th>
+                            <th className="px-1 py-3">Dif</th>
                             <th className="px-2 py-3 text-favale-dark font-black">PTS</th>
                         </tr>
                     </thead>
@@ -934,15 +937,20 @@ const PositionsView = ({ teams, matches }: any) => {
                             <tr key={row.teamId} className="hover:bg-gray-50">
                                 <td className="px-3 py-3 font-bold text-gray-700 flex items-center gap-2">
                                     <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${idx < 2 ? 'bg-favale-primary text-white' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
-                                    {row.teamName}
+                                    <span className="truncate max-w-[100px] block" title={row.teamName}>{row.teamName}</span>
                                 </td>
-                                <td className="px-2 py-3 text-center text-gray-500">{row.played}</td>
-                                <td className="px-2 py-3 text-center text-gray-500">{row.won}</td>
+                                <td className="px-1 py-3 text-center text-gray-500">{row.played}</td>
+                                <td className="px-1 py-3 text-center text-gray-500">{row.won}</td>
+                                <td className="px-1 py-3 text-center text-gray-500 text-[10px]">{row.pointsFor}</td>
+                                <td className="px-1 py-3 text-center text-gray-500 text-[10px]">{row.pointsAgainst}</td>
+                                <td className={`px-1 py-3 text-center text-[10px] font-bold ${row.pointsDiff > 0 ? 'text-green-600' : row.pointsDiff < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {row.pointsDiff > 0 ? '+' : ''}{row.pointsDiff}
+                                </td>
                                 <td className="px-2 py-3 text-center font-black text-favale-dark bg-green-50/50">{row.points}</td>
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={5} className="text-center py-6 text-gray-400 text-xs">Sin datos</td>
+                                <td colSpan={8} className="text-center py-6 text-gray-400 text-xs">Sin datos</td>
                             </tr>
                         )}
                     </tbody>

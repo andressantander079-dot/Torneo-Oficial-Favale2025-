@@ -69,6 +69,9 @@ export interface TableRow {
   setsWon: number;
   setsLost: number;
   pointsRatio: number; // For tie-breaking
+  pointsFor: number;
+  pointsAgainst: number;
+  pointsDiff: number;
 }
 
 export interface LocationGuide {
