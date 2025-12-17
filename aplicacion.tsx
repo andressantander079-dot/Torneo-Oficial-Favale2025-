@@ -21,7 +21,14 @@ const mapTeamFromDB = (t: any): Team => ({
         name: p.nombre,
         number: p.numero,
         position: p.posicion
-    })).sort((a: any, b: any) => Number(a.number) - Number(b.number)) : []
+    })).sort((a: any, b: any) => {
+        const numA = Number(a.number);
+        const numB = Number(b.number);
+        if (numA === 0 && numB === 0) return 0;
+        if (numA === 0) return 1;
+        if (numB === 0) return -1;
+        return numA - numB;
+    }) : []
 });
 
 const mapMatchFromDB = (m: any): Match => ({
@@ -102,7 +109,7 @@ const HomeView = () => (
   </div>
 );
 
-const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteTeam, onAddPlayer, onDeletePlayer }: any) => {
+const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteTeam, onAddPlayer, onUpdatePlayer, onDeletePlayer }: any) => {
     const [filterCat, setFilterCat] = useState<string>('Todas');
     const [filterGender, setFilterGender] = useState<string>('Todas');
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -115,8 +122,9 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
         name: '', category: Category.SUB12, gender: Gender.FEMALE, zone: 'Unica'
     });
 
-    // Estado para Agregar Jugador
+    // Estado para Agregar/Editar Jugador
     const [showPlayerForm, setShowPlayerForm] = useState(false);
+    const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
     const [playerForm, setPlayerForm] = useState({ number: '', name: '', position: '' });
 
     const filteredTeams = teams.filter((t: Team) => {
@@ -154,10 +162,21 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
 
     const handleSavePlayer = (teamId: string) => {
         if(playerForm.name && playerForm.number) {
-            onAddPlayer(teamId, playerForm);
+            if (editingPlayerId) {
+                onUpdatePlayer({ id: editingPlayerId, ...playerForm });
+            } else {
+                onAddPlayer(teamId, playerForm);
+            }
             setPlayerForm({ number: '', name: '', position: '' });
             setShowPlayerForm(false);
+            setEditingPlayerId(null);
         }
+    };
+
+    const handleEditPlayerClick = (player: Player) => {
+        setEditingPlayerId(player.id);
+        setPlayerForm({ number: String(player.number), name: player.name, position: player.position });
+        setShowPlayerForm(true);
     };
 
     return (
@@ -300,7 +319,10 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
                                                         </div>
                                                     </div>
                                                     {isAdmin && (
-                                                        <button onClick={() => onDeletePlayer(p.id)} className="text-red-300 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                                        <div className="flex gap-1">
+                                                            <button onClick={() => handleEditPlayerClick(p)} className="text-blue-300 hover:text-blue-500 p-2"><Edit2 size={16}/></button>
+                                                            <button onClick={() => onDeletePlayer(p.id)} className="text-red-300 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             ))}
@@ -315,12 +337,12 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
                                     {isAdmin && (
                                         <div className="mt-6 pt-4 border-t border-gray-100">
                                             {!showPlayerForm ? (
-                                                <button onClick={() => setShowPlayerForm(true)} className="w-full py-3 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:border-favale-primary hover:text-favale-primary transition-all flex items-center justify-center gap-2">
+                                                <button onClick={() => { setEditingPlayerId(null); setPlayerForm({ number: '', name: '', position: '' }); setShowPlayerForm(true); }} className="w-full py-3 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:border-favale-primary hover:text-favale-primary transition-all flex items-center justify-center gap-2">
                                                     <Plus size={16}/> AGREGAR JUGADOR
                                                 </button>
                                             ) : (
                                                 <div className="bg-white p-4 rounded-xl border border-green-200 shadow-lg animate-fade-in">
-                                                    <h5 className="text-xs font-bold text-favale-primary mb-3">Nuevo Jugador</h5>
+                                                    <h5 className="text-xs font-bold text-favale-primary mb-3">{editingPlayerId ? 'Editar Jugador' : 'Nuevo Jugador'}</h5>
                                                     <div className="flex gap-2 mb-3">
                                                         <input type="number" placeholder="#" className="w-14 p-2 border rounded-lg text-sm bg-gray-50" value={playerForm.number} onChange={e => setPlayerForm({...playerForm, number: e.target.value})} />
                                                         <input type="text" placeholder="Nombre y Apellido" className="flex-1 p-2 border rounded-lg text-sm bg-gray-50" value={playerForm.name} onChange={e => setPlayerForm({...playerForm, name: e.target.value})} />
@@ -961,7 +983,7 @@ const PositionsView = ({ teams, matches }: any) => {
                             <Trophy size={20} className="fill-yellow-500 text-yellow-600"/>
                             <h3 className="font-bold uppercase tracking-tight">Copa de Oro</h3>
                         </div>
-                        <p className="text-[10px] text-yellow-600 mb-3 -mt-2">Clasifican los 2 mejores de cada zona. (Arrastre de puntos)</p>
+                        <p className="text-[10px] text-yellow-600 mb-3 -mt-2">Clasifican el 1° y 2° de cada zona. (Arrastre de puntos)</p>
                         <RenderTableBlock title="Tabla Oro" data={goldTable} />
                     </div>
 
@@ -1264,6 +1286,15 @@ const App = () => {
       fetchData();
   };
 
+  const handleUpdatePlayer = async (player: any) => {
+    await supabase.from('jugadores').update({
+        nombre: player.name,
+        numero: player.number,
+        posicion: player.position
+    }).eq('id', player.id);
+    fetchData();
+  };
+
   const handleDeletePlayer = async (id: string) => {
     console.log('id de jugador'+id);  
     await supabase.from('jugadores').delete().eq('id', id);
@@ -1320,7 +1351,7 @@ const App = () => {
   const renderContent = () => {
       switch(activeTab) {
           case 'home': return <HomeView />;
-          case 'teams': return <TeamsView teams={teams} matches={matches} isAdmin={isAdmin} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={handleDeleteTeam} onAddPlayer={handleAddPlayer} onDeletePlayer={handleDeletePlayer} />;
+          case 'teams': return <TeamsView teams={teams} matches={matches} isAdmin={isAdmin} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={handleDeleteTeam} onAddPlayer={handleAddPlayer} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} />;
           case 'fixture': return <FixtureView matches={matches} teams={teams} isAdmin={isAdmin} onUpdateMatch={handleUpdateMatch} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} isLoading={loading} />;
           case 'positions': return <PositionsView teams={teams} matches={matches} />;
           case 'locations': return <LocationsView />;
