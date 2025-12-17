@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Lock, Calendar, Trophy, Users, Map as MapIcon, Info, 
-  Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2, Shirt, Star, ChevronRight
+  Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2, Star, ChevronRight
 } from 'lucide-react';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
 import { generateTable } from './utils';
@@ -488,8 +488,12 @@ const ResultModal = ({ match, teams, onClose, onSave }: any) => {
     const isSub16 = match.category === Category.SUB16;
     const maxSets = isSub16 ? 5 : 3;
     const [sets, setSets] = useState<{home: string, away: string}[]>(
-        match.sets.length > 0 ? match.sets.map((s:any) => ({home: s.home.toString(), away: s.away.toString()})) 
-        : Array.from({ length: maxSets }, () => ({home: '', away: ''}))
+        Array.from({ length: maxSets }, (_, i) => {
+            if (i < match.sets.length) {
+                return { home: match.sets[i].home.toString(), away: match.sets[i].away.toString() };
+            }
+            return { home: '', away: '' };
+        })
     );
     const [mvpHome, setMvpHome] = useState(match.mvpHomeId || '');
     const [mvpAway, setMvpAway] = useState(match.mvpAwayId || '');
@@ -1183,7 +1187,7 @@ const App = () => {
         if (teamsData) {
             const combinedTeams = teamsData.map((team: any) => ({
                 ...team,
-                jugadores: playersData ? playersData.filter((p: any) => p.team_id === team.id.toString()) : []
+                jugadores: playersData ? playersData.filter((p: any) => String(p.team_id) === String(team.id)) : []
             }));
             setTeams(combinedTeams.map(mapTeamFromDB));
         }
@@ -1239,16 +1243,13 @@ const App = () => {
           team_id: teamId, // Assuming column name is team_id based on previous context
           nombre: player.name,
           numero: player.number,
-          posicion: player.position,
-          id:crypto.randomUUID()
-    
+          posicion: player.position
       }]);
       fetchData();
   };
 
   const handleDeletePlayer = async (id: string) => {
-    console.log('id de jugador'+id);  
-    await supabase.from('jugadores').delete().eq('id', id);
+      await supabase.from('jugadores').delete().eq('id', id);
       fetchData();
   };
 
