@@ -970,7 +970,7 @@ const PositionsView = ({ teams, matches }: any) => {
                             <Medal size={20} className="text-gray-500"/>
                             <h3 className="font-bold uppercase tracking-tight">Copa de Plata</h3>
                         </div>
-                        <p className="text-[10px] text-gray-500 mb-3 -mt-2">Clasifican 3° y 4° de cada zona. (Arrastre de puntos)</p>
+                        <p className="text-[10px] text-gray-500 mb-3 -mt-2">Clasifican los 2 equipos con menos cantidad de puntos de cada zona. (Arrastre de puntos)</p>
                         <RenderTableBlock title="Tabla Plata" data={silverTable} />
                     </div>
                 </div>
@@ -1170,10 +1170,28 @@ const App = () => {
   // Fetch Data
   useEffect(() => {
     fetchData();
+
+    // Subscribe to changes
+    const matchesSubscription = supabase
+      .channel('public:partidos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, () => {
+        fetchData(true);
+      })
+      .subscribe();
+
+    const teamsSubscription = supabase
+      .channel('public:equipos')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipos' }, () => fetchData(true))
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(matchesSubscription);
+      supabase.removeChannel(teamsSubscription);
+    };
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (skipLoading = false) => {
+    if (!skipLoading) setLoading(true);
     try {
         const { data: teamsData } = await supabase.from('equipos').select('*');
         const { data: playersData } = await supabase.from('jugadores').select('*');
