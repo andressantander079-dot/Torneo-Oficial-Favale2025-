@@ -67,7 +67,7 @@ const HomeView = () => (
     <div className="bg-gradient-to-br from-favale-dark to-favale-primary text-white p-6 rounded-3xl shadow-xl mx-4 mt-4">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight mb-2">USHUAIA 2026</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight mb-2">USHUAIA 2025</h1>
           <p className="text-green-100 text-sm font-medium uppercase tracking-wider">Fin del Mundo</p>
         </div>
         <Trophy className="text-yellow-400 opacity-80" size={40} />
@@ -285,15 +285,16 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
                         <div className="p-6 overflow-y-auto bg-white flex-1">
                             {teamTab === 'roster' && (
                                 <div className="space-y-3">
+                                    { console.log(selectedTeam.players) }
                                     {selectedTeam.players && selectedTeam.players.length > 0 ? (
                                         <div className="grid grid-cols-1 gap-2">
                                             {selectedTeam.players.map((p: Player) => (
-                                                <div key={p.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                                                <div key={p.id} className={`${p.number.toString() === '0' ? 'bg-green-200' : ''} flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 shadow-sm`}>
                                                     <div className="flex items-center gap-3">
                                                         <span className="w-8 h-8 flex items-center justify-center bg-favale-light text-favale-dark rounded-full text-sm font-black border border-green-100">
                                                             {p.number}
                                                         </span>
-                                                        <div className="flex flex-col">
+                                                   <div className="flex flex-col">
                                                             <span className="text-sm font-bold text-gray-700 leading-none">{p.name}</span>
                                                             <span className="text-[10px] text-gray-400 leading-none mt-1 uppercase font-medium">{p.position || 'Jugador'}</span>
                                                         </div>
@@ -1238,13 +1239,16 @@ const App = () => {
           team_id: teamId, // Assuming column name is team_id based on previous context
           nombre: player.name,
           numero: player.number,
-          posicion: player.position
+          posicion: player.position,
+          id:crypto.randomUUID()
+    
       }]);
       fetchData();
   };
 
   const handleDeletePlayer = async (id: string) => {
-      await supabase.from('jugadores').delete().eq('id', id);
+    console.log('id de jugador'+id);  
+    await supabase.from('jugadores').delete().eq('id', id);
       fetchData();
   };
 
