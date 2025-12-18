@@ -4,7 +4,7 @@ import {
   Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2, Shirt, Star, ChevronRight
 } from 'lucide-react';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
-import { generateTable } from './utils';
+import { generateTable, getCupStandings } from './utils';
 import { supabase } from './supabaseClient';
 import { INITIAL_LOCATIONS } from './constants';
 
@@ -44,7 +44,7 @@ const mapMatchFromDB = (m: any): Match => ({
     sets: typeof m.sets === 'string' ? JSON.parse(m.sets) : (m.sets || []),
     mvpHomeId: m.mvp_local,
     mvpAwayId: m.mvp_visitante,
-    stage: 'Fase Regular'
+    stage: m.etapa || 'Fase de Grupos'
 });
 
 const mapStaffFromDB = (s: any): StaffMember => ({
@@ -608,7 +608,8 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
     gender: Gender.FEMALE,
     court: Court.CANCHA4,
     date: new Date().toISOString().split('T')[0],
-    time: '12:00'
+    time: '12:00',
+    stage: 'Fase de Grupos'
   });
   const [confirmData, setConfirmData] = useState<{match: Match, sets: any[], homeMvp?: string, awayMvp?: string} | null>(null);
 
@@ -701,9 +702,9 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
       {isAdmin && (
           <button 
             onClick={() => setShowAddModal(true)}
-            className="w-full mb-6 bg-favale-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 hover:bg-green-700 transition-colors"
+            className="fixed bottom-24 right-4 z-30 bg-favale-primary text-white p-4 rounded-full shadow-lg hover:bg-green-700 transition-all hover:scale-105 active:scale-95"
           >
-              <Plus size={20} /> Nuevo Partido
+              <Plus size={24} />
           </button>
       )}
 
@@ -714,39 +715,47 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
             const homeSets = match.sets.filter(s => s.home > s.away).length;
             const awaySets = match.sets.filter(s => s.away > s.home).length;
 
+            const isFinal = match.stage === 'Final';
+
             return (
-            <div key={match.id} className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-favale-accent relative overflow-hidden">
-                <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
-                    <span className="text-favale-dark font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight">
+            <div key={match.id} className={`${isFinal ? 'bg-yellow-400 text-black border-l-black' : 'bg-white border-l-favale-accent'} rounded-xl p-4 shadow-sm border-l-4 relative overflow-hidden`}>
+                <div className={`flex justify-between items-center mb-4 ${isFinal ? 'border-black/10' : 'border-gray-200'} border-b pb-2`}>
+                    <span className={`${isFinal ? 'text-black' : 'text-favale-dark'} font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight`}>
                         <Calendar size={18} strokeWidth={2.5}/> {getFormattedDate(match.date)}, {match.time}HS
                     </span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-1 rounded">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${isFinal ? 'bg-black/10 text-black' : 'text-gray-400 bg-gray-50'}`}>
                         {match.court.split('(')[0]}
                     </span>
                 </div>
                 
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 relative">
                     <div className="flex-1 text-right flex flex-col items-end">
-                        <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? 'text-favale-dark' : 'text-gray-700'}`}>
+                        <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.homeTeamId)}
                         </span>
                         {match.isFinished && (
-                            <span className="text-2xl font-black text-favale-dark mt-1">{homeSets}</span>
+                            <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{homeSets}</span>
                         )}
                     </div>
                     
                     <div className="flex flex-col items-center justify-center min-w-[30px] pt-1">
-                         <span className="text-gray-300 font-bold text-sm">VS</span>
+                         <span className={`${isFinal ? 'text-black/50' : 'text-gray-300'} font-bold text-sm`}>VS</span>
                     </div>
 
                     <div className="flex-1 text-left flex flex-col items-start">
-                        <span className={`font-bold text-lg leading-tight ${match.isFinished && awaySets > homeSets ? 'text-favale-dark' : 'text-gray-700'}`}>
+                        <span className={`font-bold text-lg leading-tight ${match.isFinished && awaySets > homeSets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.awayTeamId)}
                         </span>
                         {match.isFinished && (
-                            <span className="text-2xl font-black text-favale-dark mt-1">{awaySets}</span>
+                            <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{awaySets}</span>
                         )}
                     </div>
+                </div>
+
+                <div className="flex justify-center mt-2">
+                     <span className="bg-green-100 text-green-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        {match.stage}
+                     </span>
                 </div>
 
                 {match.isFinished && (
@@ -826,6 +835,21 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                             <label className="text-xs font-bold text-gray-500 block mb-1">Hora</label>
                             <input type="time" className="w-full p-2 border rounded text-sm" value={newMatchData.time} onChange={e => setNewMatchData({...newMatchData, time: e.target.value})} />
                          </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">Instancia</label>
+                        <select
+                            className="w-full p-2 border rounded text-sm"
+                            value={newMatchData.stage}
+                            onChange={e => setNewMatchData({...newMatchData, stage: e.target.value})}
+                        >
+                            <option value="Fase de Grupos">Fase de Grupos</option>
+                            <option value="Octavos">Octavos</option>
+                            <option value="Cuartos">Cuartos</option>
+                            <option value="Semis">Semis</option>
+                            <option value="Final">Final</option>
+                        </select>
                     </div>
 
                     <div className="space-y-2 pt-2">
@@ -923,9 +947,10 @@ const PositionsView = ({ teams, matches }: any) => {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-[10px] uppercase tracking-wider text-center">
                         <tr>
-                            <th className="px-3 py-3 text-left w-1/2">Equipo</th>
-                            <th className="px-2 py-3">PJ</th>
-                            <th className="px-2 py-3">PG</th>
+                            <th className="px-3 py-3 text-left w-1/3">Equipo</th>
+                            <th className="px-1 py-3">PJ</th>
+                            <th className="px-1 py-3">PG</th>
+                            <th className="px-1 py-3">Dif</th>
                             <th className="px-2 py-3 text-favale-dark font-black">PTS</th>
                         </tr>
                     </thead>
@@ -934,10 +959,13 @@ const PositionsView = ({ teams, matches }: any) => {
                             <tr key={row.teamId} className="hover:bg-gray-50">
                                 <td className="px-3 py-3 font-bold text-gray-700 flex items-center gap-2">
                                     <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${idx < 2 ? 'bg-favale-primary text-white' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
-                                    {row.teamName}
+                                    <span className="truncate max-w-[100px] block" title={row.teamName}>{row.teamName}</span>
                                 </td>
-                                <td className="px-2 py-3 text-center text-gray-500">{row.played}</td>
-                                <td className="px-2 py-3 text-center text-gray-500">{row.won}</td>
+                                <td className="px-1 py-3 text-center text-gray-500">{row.played}</td>
+                                <td className="px-1 py-3 text-center text-gray-500">{row.won}</td>
+                                <td className={`px-1 py-3 text-center text-[10px] font-bold ${row.pointsDiff > 0 ? 'text-green-600' : row.pointsDiff < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {row.pointsDiff > 0 ? '+' : ''}{row.pointsDiff}
+                                </td>
                                 <td className="px-2 py-3 text-center font-black text-favale-dark bg-green-50/50">{row.points}</td>
                             </tr>
                         )) : (
@@ -957,19 +985,7 @@ const PositionsView = ({ teams, matches }: any) => {
 
         // LOGIC: Sub 13 Female (Zones + Cups)
         if (selectedCategory === Category.SUB13 && selectedGender === Gender.FEMALE) {
-            const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
-            const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
-
-            // Calculate Qualifiers (Top 2 for Gold, Rest for Silver)
-            const goldTeamsIds = [...zoneA.slice(0, 2), ...zoneB.slice(0, 2)].map(r => r.teamId);
-            const silverTeamsIds = [...zoneA.slice(2), ...zoneB.slice(2)].map(r => r.teamId);
-
-            const goldTeams = genderTeams.filter((t: Team) => goldTeamsIds.includes(t.id));
-            const silverTeams = genderTeams.filter((t: Team) => silverTeamsIds.includes(t.id));
-
-            // "Arrastre de puntos": generating table with only these teams calculates points based on matches between them
-            const goldTable = generateTable(matches, goldTeams, Category.SUB13);
-            const silverTable = generateTable(matches, silverTeams, Category.SUB13);
+            const { zoneA, zoneB, goldTable, silverTable } = getCupStandings(matches, genderTeams, Category.SUB13);
 
             return (
                 <div className="space-y-6">
