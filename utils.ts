@@ -20,11 +20,12 @@ export const calculatePoints = (category: Category, homeSets: number, awaySets: 
     if (homeSets === 3 && awaySets === 2) return { home: 2, away: 1 };
     if (homeSets === 2 && awaySets === 3) return { home: 1, away: 2 };
   }
-  return { home: 0, away: 0 }; // Draw or incomplete?
+  return { home: 0, away: 0 };
 };
 
 export const generateTable = (matches: Match[], teams: Team[], category: Category, zone?: string): TableRow[] => {
-  // Filter matches for this category
+  // Filter matches for this category (and ensure they are finished)
+  // We include all stages because "arrastre" might rely on Group Stage matches counting for Cup Stage tables
   const categoryMatches = matches.filter(m => m.category === category && m.isFinished);
   
   // Filter teams for this category (and zone if provided)
@@ -58,8 +59,11 @@ export const generateTable = (matches: Match[], teams: Team[], category: Categor
     const homeStats = table[match.homeTeamId];
     const awayStats = table[match.awayTeamId];
 
-    // Only process if both teams are in the current table context (e.g. correct zone)
-    // Important for cross-zone matches or playoffs if we only want group stage table
+    // Only process if both teams are in the current table context
+    // This effectively handles "Arrastre de Puntos":
+    // If we are generating a "Gold Cup" table with only Gold Teams,
+    // matches against eliminated teams (not in the table) are ignored.
+    // Matches between two Gold Teams (even from Group Stage) are counted.
     if (!homeStats || !awayStats) return;
 
     // Count Sets and Points
@@ -94,7 +98,7 @@ export const generateTable = (matches: Match[], teams: Team[], category: Categor
       homeStats.lost++;
     }
 
-    // Update Set Points stats (Paf, PeC, Dif)
+    // Update Points Stats
     homeStats.pointsFor += homePoints;
     homeStats.pointsAgainst += awayPoints;
     homeStats.pointsDiff = homeStats.pointsFor - homeStats.pointsAgainst;
@@ -109,11 +113,36 @@ export const generateTable = (matches: Match[], teams: Team[], category: Categor
     awayStats.points += points.away;
   });
 
-  // Sort: Points DESC, then Points Diff (Dif), then Sets Ratio (simplified to Sets Won for this demo), then Name
+  // Sort: Points DESC, then Points Diff (Dif), then Sets Ratio (Diff), then Name
   return Object.values(table).sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points;
     if (b.pointsDiff !== a.pointsDiff) return b.pointsDiff - a.pointsDiff;
     if ((b.setsWon - b.setsLost) !== (a.setsWon - a.setsLost)) return (b.setsWon - b.setsLost) - (a.setsWon - a.setsLost);
     return a.teamName.localeCompare(b.teamName);
   });
+};
+
+export const getCupStandings = (matches: Match[], teams: Team[], category: Category) => {
+    // Generate Zone Tables first to determine classification
+    const zoneA = generateTable(matches, teams, category, 'A');
+    const zoneB = generateTable(matches, teams, category, 'B');
+
+    // Classification Logic:
+    // Gold: Top 2 from each Zone
+    // Silver: The rest (effectively the bottom teams)
+    const goldTeamsIds = [...zoneA.slice(0, 2), ...zoneB.slice(0, 2)].map(r => r.teamId);
+
+    // We take all remaining teams for Silver.
+    // This satisfies "bottom 2" if zones are size 3 or 4.
+    const silverTeamsIds = [...zoneA.slice(2), ...zoneB.slice(2)].map(r => r.teamId);
+
+    const goldTeams = teams.filter(t => goldTeamsIds.includes(t.id));
+    const silverTeams = teams.filter(t => silverTeamsIds.includes(t.id));
+
+    // Generate Cup Tables
+    // Passing specific team lists ensures "Arrastre de Puntos" logic in generateTable works
+    const goldTable = generateTable(matches, goldTeams, category);
+    const silverTable = generateTable(matches, silverTeams, category);
+
+    return { zoneA, zoneB, goldTable, silverTable };
 };

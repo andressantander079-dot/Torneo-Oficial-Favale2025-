@@ -4,7 +4,7 @@ import {
   Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2, Shirt, Star, ChevronRight
 } from 'lucide-react';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
-import { generateTable } from './utils';
+import { generateTable, getCupStandings } from './utils';
 import { supabase } from './supabaseClient';
 import { INITIAL_LOCATIONS } from './constants';
 
@@ -986,19 +986,7 @@ const PositionsView = ({ teams, matches }: any) => {
 
         // LOGIC: Sub 13 Female (Zones + Cups)
         if (selectedCategory === Category.SUB13 && selectedGender === Gender.FEMALE) {
-            const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
-            const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
-
-            // Calculate Qualifiers (Top 2 for Gold, Rest for Silver)
-            const goldTeamsIds = [...zoneA.slice(0, 2), ...zoneB.slice(0, 2)].map(r => r.teamId);
-            const silverTeamsIds = [...zoneA.slice(2), ...zoneB.slice(2)].map(r => r.teamId);
-
-            const goldTeams = genderTeams.filter((t: Team) => goldTeamsIds.includes(t.id));
-            const silverTeams = genderTeams.filter((t: Team) => silverTeamsIds.includes(t.id));
-
-            // "Arrastre de puntos": generating table with only these teams calculates points based on matches between them
-            const goldTable = generateTable(matches, goldTeams, Category.SUB13);
-            const silverTable = generateTable(matches, silverTeams, Category.SUB13);
+            const { zoneA, zoneB, goldTable, silverTable } = getCupStandings(matches, genderTeams, Category.SUB13);
 
             return (
                 <div className="space-y-6">
