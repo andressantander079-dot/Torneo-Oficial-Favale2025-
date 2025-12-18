@@ -715,7 +715,7 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
             const homeSets = match.sets.filter(s => s.home > s.away).length;
             const awaySets = match.sets.filter(s => s.away > s.home).length;
 
-            const isFinal = match.stage === 'Final';
+            const isFinal = match.stage?.toLowerCase().includes('final');
 
             return (
             <div key={match.id} className={`${isFinal ? 'bg-yellow-400 text-black border-l-black' : 'bg-white border-l-favale-accent'} rounded-xl p-4 shadow-sm border-l-4 relative overflow-hidden`}>
@@ -839,17 +839,13 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
 
                     <div>
                         <label className="text-xs font-bold text-gray-500 block mb-1">Instancia</label>
-                        <select
+                        <input
+                            type="text"
                             className="w-full p-2 border rounded text-sm"
+                            placeholder="Ej: Fase de Grupos, Final, Semis..."
                             value={newMatchData.stage}
                             onChange={e => setNewMatchData({...newMatchData, stage: e.target.value})}
-                        >
-                            <option value="Fase de Grupos">Fase de Grupos</option>
-                            <option value="Octavos">Octavos</option>
-                            <option value="Cuartos">Cuartos</option>
-                            <option value="Semis">Semis</option>
-                            <option value="Final">Final</option>
-                        </select>
+                        />
                     </div>
 
                     <div className="space-y-2 pt-2">
