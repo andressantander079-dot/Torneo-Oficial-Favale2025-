@@ -702,9 +702,9 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
       {isAdmin && (
           <button 
             onClick={() => setShowAddModal(true)}
-            className="w-full mb-6 bg-favale-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 hover:bg-green-700 transition-colors"
+            className="fixed bottom-24 right-4 z-30 bg-favale-primary text-white p-4 rounded-full shadow-lg hover:bg-green-700 transition-all hover:scale-105 active:scale-95"
           >
-              <Plus size={20} /> Nuevo Partido
+              <Plus size={24} />
           </button>
       )}
 
@@ -729,13 +729,6 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                 </div>
                 
                 <div className="flex items-start justify-between gap-4 relative">
-                    {/* Stage Label */}
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -ml-2">
-                         <span className="bg-green-300 text-green-900 text-[10px] font-bold px-2 py-0.5 rounded-r-lg uppercase tracking-wide shadow-sm">
-                            {match.stage}
-                         </span>
-                    </div>
-
                     <div className="flex-1 text-right flex flex-col items-end">
                         <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.homeTeamId)}
@@ -757,6 +750,12 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                             <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{awaySets}</span>
                         )}
                     </div>
+                </div>
+
+                <div className="flex justify-center mt-2">
+                     <span className="bg-green-100 text-green-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        {match.stage}
+                     </span>
                 </div>
 
                 {match.isFinished && (
