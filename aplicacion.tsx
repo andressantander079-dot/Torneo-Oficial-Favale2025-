@@ -44,7 +44,7 @@ const mapMatchFromDB = (m: any): Match => ({
     sets: typeof m.sets === 'string' ? JSON.parse(m.sets) : (m.sets || []),
     mvpHomeId: m.mvp_local,
     mvpAwayId: m.mvp_visitante,
-    stage: 'Fase Regular'
+    stage: m.etapa || 'Fase de Grupos'
 });
 
 const mapStaffFromDB = (s: any): StaffMember => ({
@@ -608,7 +608,8 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
     gender: Gender.FEMALE,
     court: Court.CANCHA4,
     date: new Date().toISOString().split('T')[0],
-    time: '12:00'
+    time: '12:00',
+    stage: 'Fase de Grupos'
   });
   const [confirmData, setConfirmData] = useState<{match: Match, sets: any[], homeMvp?: string, awayMvp?: string} | null>(null);
 
@@ -714,37 +715,46 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
             const homeSets = match.sets.filter(s => s.home > s.away).length;
             const awaySets = match.sets.filter(s => s.away > s.home).length;
 
+            const isFinal = match.stage === 'Final';
+
             return (
-            <div key={match.id} className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-favale-accent relative overflow-hidden">
-                <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
-                    <span className="text-favale-dark font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight">
+            <div key={match.id} className={`${isFinal ? 'bg-yellow-400 text-black border-l-black' : 'bg-white border-l-favale-accent'} rounded-xl p-4 shadow-sm border-l-4 relative overflow-hidden`}>
+                <div className={`flex justify-between items-center mb-4 ${isFinal ? 'border-black/10' : 'border-gray-200'} border-b pb-2`}>
+                    <span className={`${isFinal ? 'text-black' : 'text-favale-dark'} font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight`}>
                         <Calendar size={18} strokeWidth={2.5}/> {getFormattedDate(match.date)}, {match.time}HS
                     </span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-1 rounded">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${isFinal ? 'bg-black/10 text-black' : 'text-gray-400 bg-gray-50'}`}>
                         {match.court.split('(')[0]}
                     </span>
                 </div>
                 
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 relative">
+                    {/* Stage Label */}
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -ml-2">
+                         <span className="bg-green-300 text-green-900 text-[10px] font-bold px-2 py-0.5 rounded-r-lg uppercase tracking-wide shadow-sm">
+                            {match.stage}
+                         </span>
+                    </div>
+
                     <div className="flex-1 text-right flex flex-col items-end">
-                        <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? 'text-favale-dark' : 'text-gray-700'}`}>
+                        <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.homeTeamId)}
                         </span>
                         {match.isFinished && (
-                            <span className="text-2xl font-black text-favale-dark mt-1">{homeSets}</span>
+                            <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{homeSets}</span>
                         )}
                     </div>
                     
                     <div className="flex flex-col items-center justify-center min-w-[30px] pt-1">
-                         <span className="text-gray-300 font-bold text-sm">VS</span>
+                         <span className={`${isFinal ? 'text-black/50' : 'text-gray-300'} font-bold text-sm`}>VS</span>
                     </div>
 
                     <div className="flex-1 text-left flex flex-col items-start">
-                        <span className={`font-bold text-lg leading-tight ${match.isFinished && awaySets > homeSets ? 'text-favale-dark' : 'text-gray-700'}`}>
+                        <span className={`font-bold text-lg leading-tight ${match.isFinished && awaySets > homeSets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.awayTeamId)}
                         </span>
                         {match.isFinished && (
-                            <span className="text-2xl font-black text-favale-dark mt-1">{awaySets}</span>
+                            <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{awaySets}</span>
                         )}
                     </div>
                 </div>
@@ -826,6 +836,21 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                             <label className="text-xs font-bold text-gray-500 block mb-1">Hora</label>
                             <input type="time" className="w-full p-2 border rounded text-sm" value={newMatchData.time} onChange={e => setNewMatchData({...newMatchData, time: e.target.value})} />
                          </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">Instancia</label>
+                        <select
+                            className="w-full p-2 border rounded text-sm"
+                            value={newMatchData.stage}
+                            onChange={e => setNewMatchData({...newMatchData, stage: e.target.value})}
+                        >
+                            <option value="Fase de Grupos">Fase de Grupos</option>
+                            <option value="Octavos">Octavos</option>
+                            <option value="Cuartos">Cuartos</option>
+                            <option value="Semis">Semis</option>
+                            <option value="Final">Final</option>
+                        </select>
                     </div>
 
                     <div className="space-y-2 pt-2">
@@ -926,8 +951,6 @@ const PositionsView = ({ teams, matches }: any) => {
                             <th className="px-3 py-3 text-left w-1/3">Equipo</th>
                             <th className="px-1 py-3">PJ</th>
                             <th className="px-1 py-3">PG</th>
-                            <th className="px-1 py-3">PaF</th>
-                            <th className="px-1 py-3">PeC</th>
                             <th className="px-1 py-3">Dif</th>
                             <th className="px-2 py-3 text-favale-dark font-black">PTS</th>
                         </tr>
@@ -941,8 +964,6 @@ const PositionsView = ({ teams, matches }: any) => {
                                 </td>
                                 <td className="px-1 py-3 text-center text-gray-500">{row.played}</td>
                                 <td className="px-1 py-3 text-center text-gray-500">{row.won}</td>
-                                <td className="px-1 py-3 text-center text-gray-500 text-[10px]">{row.pointsFor}</td>
-                                <td className="px-1 py-3 text-center text-gray-500 text-[10px]">{row.pointsAgainst}</td>
                                 <td className={`px-1 py-3 text-center text-[10px] font-bold ${row.pointsDiff > 0 ? 'text-green-600' : row.pointsDiff < 0 ? 'text-red-500' : 'text-gray-500'}`}>
                                     {row.pointsDiff > 0 ? '+' : ''}{row.pointsDiff}
                                 </td>
@@ -950,7 +971,7 @@ const PositionsView = ({ teams, matches }: any) => {
                             </tr>
                         )) : (
                             <tr>
-                                <td colSpan={8} className="text-center py-6 text-gray-400 text-xs">Sin datos</td>
+                                <td colSpan={5} className="text-center py-6 text-gray-400 text-xs">Sin datos</td>
                             </tr>
                         )}
                     </tbody>
