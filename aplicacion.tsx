@@ -1320,7 +1320,8 @@ const App = () => {
 
   // Match CRUD
   const handleAddMatch = async (match: Partial<Match>) => {
-      const { error } = await supabase.from('partidos').insert([{
+      console.log("Adding match:", match);
+      const { error, data } = await supabase.from('partidos').insert([{
           fecha: match.date,
           hora: match.time,
           lugar: match.court,
@@ -1331,12 +1332,15 @@ const App = () => {
           etapa: match.stage,
           is_finished: false,
           sets: []
-      }]);
+      }]).select();
+
       if(error) {
           console.error("Error creating match:", error);
           alert("Error al crear partido: " + error.message);
       } else {
+          console.log("Match created successfully:", data);
           fetchData();
+          // Force UI refresh if needed, but fetchData() sets state
       }
   };
 
