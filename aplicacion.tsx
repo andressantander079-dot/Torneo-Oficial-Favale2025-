@@ -4,7 +4,7 @@ import {
   Menu, X, Plus, Trash2, Edit2, CheckCircle, Shield, Medal, AlertTriangle, LogOut, Loader2, Shirt, Star, ChevronRight
 } from 'lucide-react';
 import { Category, Gender, Match, Team, StaffMember, Court, Player, LocationGuide } from './types';
-import { generateTable } from './utils';
+import { generateTable, getCupStandings } from './utils';
 import { supabase } from './supabaseClient';
 import { INITIAL_LOCATIONS } from './constants';
 
@@ -21,7 +21,14 @@ const mapTeamFromDB = (t: any): Team => ({
         name: p.nombre,
         number: p.numero,
         position: p.posicion
-    })).sort((a: any, b: any) => Number(a.number) - Number(b.number)) : []
+    })).sort((a: any, b: any) => {
+        const numA = Number(a.number);
+        const numB = Number(b.number);
+        if (numA === 0 && numB === 0) return 0;
+        if (numA === 0) return 1;
+        if (numB === 0) return -1;
+        return numA - numB;
+    }) : []
 });
 
 const mapMatchFromDB = (m: any): Match => ({
@@ -37,7 +44,7 @@ const mapMatchFromDB = (m: any): Match => ({
     sets: typeof m.sets === 'string' ? JSON.parse(m.sets) : (m.sets || []),
     mvpHomeId: m.mvp_local,
     mvpAwayId: m.mvp_visitante,
-    stage: 'Fase Regular'
+    stage: m.etapa || 'Fase de Grupos'
 });
 
 const mapStaffFromDB = (s: any): StaffMember => ({
@@ -102,7 +109,7 @@ const HomeView = () => (
   </div>
 );
 
-const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteTeam, onAddPlayer, onDeletePlayer }: any) => {
+const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteTeam, onAddPlayer, onUpdatePlayer, onDeletePlayer }: any) => {
     const [filterCat, setFilterCat] = useState<string>('Todas');
     const [filterGender, setFilterGender] = useState<string>('Todas');
     const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
@@ -115,8 +122,9 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
         name: '', category: Category.SUB12, gender: Gender.FEMALE, zone: 'Unica'
     });
 
-    // Estado para Agregar Jugador
+    // Estado para Agregar/Editar Jugador
     const [showPlayerForm, setShowPlayerForm] = useState(false);
+    const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
     const [playerForm, setPlayerForm] = useState({ number: '', name: '', position: '' });
 
     const filteredTeams = teams.filter((t: Team) => {
@@ -154,10 +162,21 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
 
     const handleSavePlayer = (teamId: string) => {
         if(playerForm.name && playerForm.number) {
-            onAddPlayer(teamId, playerForm);
+            if (editingPlayerId) {
+                onUpdatePlayer({ id: editingPlayerId, ...playerForm });
+            } else {
+                onAddPlayer(teamId, playerForm);
+            }
             setPlayerForm({ number: '', name: '', position: '' });
             setShowPlayerForm(false);
+            setEditingPlayerId(null);
         }
+    };
+
+    const handleEditPlayerClick = (player: Player) => {
+        setEditingPlayerId(player.id);
+        setPlayerForm({ number: String(player.number), name: player.name, position: player.position });
+        setShowPlayerForm(true);
     };
 
     return (
@@ -300,7 +319,10 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
                                                         </div>
                                                     </div>
                                                     {isAdmin && (
-                                                        <button onClick={() => onDeletePlayer(p.id)} className="text-red-300 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                                        <div className="flex gap-1">
+                                                            <button onClick={() => handleEditPlayerClick(p)} className="text-blue-300 hover:text-blue-500 p-2"><Edit2 size={16}/></button>
+                                                            <button onClick={() => onDeletePlayer(p.id)} className="text-red-300 hover:text-red-500 p-2"><Trash2 size={16}/></button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             ))}
@@ -315,12 +337,12 @@ const TeamsView = ({ teams, matches, isAdmin, onAddTeam, onUpdateTeam, onDeleteT
                                     {isAdmin && (
                                         <div className="mt-6 pt-4 border-t border-gray-100">
                                             {!showPlayerForm ? (
-                                                <button onClick={() => setShowPlayerForm(true)} className="w-full py-3 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:border-favale-primary hover:text-favale-primary transition-all flex items-center justify-center gap-2">
+                                                <button onClick={() => { setEditingPlayerId(null); setPlayerForm({ number: '', name: '', position: '' }); setShowPlayerForm(true); }} className="w-full py-3 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:border-favale-primary hover:text-favale-primary transition-all flex items-center justify-center gap-2">
                                                     <Plus size={16}/> AGREGAR JUGADOR
                                                 </button>
                                             ) : (
                                                 <div className="bg-white p-4 rounded-xl border border-green-200 shadow-lg animate-fade-in">
-                                                    <h5 className="text-xs font-bold text-favale-primary mb-3">Nuevo Jugador</h5>
+                                                    <h5 className="text-xs font-bold text-favale-primary mb-3">{editingPlayerId ? 'Editar Jugador' : 'Nuevo Jugador'}</h5>
                                                     <div className="flex gap-2 mb-3">
                                                         <input type="number" placeholder="#" className="w-14 p-2 border rounded-lg text-sm bg-gray-50" value={playerForm.number} onChange={e => setPlayerForm({...playerForm, number: e.target.value})} />
                                                         <input type="text" placeholder="Nombre y Apellido" className="flex-1 p-2 border rounded-lg text-sm bg-gray-50" value={playerForm.name} onChange={e => setPlayerForm({...playerForm, name: e.target.value})} />
@@ -586,7 +608,8 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
     gender: Gender.FEMALE,
     court: Court.CANCHA4,
     date: new Date().toISOString().split('T')[0],
-    time: '12:00'
+    time: '12:00',
+    stage: 'Fase de Grupos'
   });
   const [confirmData, setConfirmData] = useState<{match: Match, sets: any[], homeMvp?: string, awayMvp?: string} | null>(null);
 
@@ -679,9 +702,9 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
       {isAdmin && (
           <button 
             onClick={() => setShowAddModal(true)}
-            className="w-full mb-6 bg-favale-primary text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-green-200 hover:bg-green-700 transition-colors"
+            className="fixed bottom-24 right-4 z-30 bg-favale-primary text-white p-4 rounded-full shadow-lg hover:bg-green-700 transition-all hover:scale-105 active:scale-95"
           >
-              <Plus size={20} /> Nuevo Partido
+              <Plus size={24} />
           </button>
       )}
 
@@ -692,39 +715,47 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
             const homeSets = match.sets.filter(s => s.home > s.away).length;
             const awaySets = match.sets.filter(s => s.away > s.home).length;
 
+            const isFinal = match.stage === 'Final';
+
             return (
-            <div key={match.id} className="bg-white rounded-xl p-4 shadow-sm border-l-4 border-favale-accent relative overflow-hidden">
-                <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
-                    <span className="text-favale-dark font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight">
+            <div key={match.id} className={`${isFinal ? 'bg-yellow-500 text-black border-l-black' : 'bg-white border-l-favale-accent'} rounded-xl p-4 shadow-sm border-l-4 relative overflow-hidden`}>
+                <div className={`flex justify-between items-center mb-4 ${isFinal ? 'border-black/10' : 'border-gray-200'} border-b pb-2`}>
+                    <span className={`${isFinal ? 'text-black' : 'text-favale-dark'} font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight`}>
                         <Calendar size={18} strokeWidth={2.5}/> {getFormattedDate(match.date)}, {match.time}HS
                     </span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-1 rounded">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${isFinal ? 'bg-black/10 text-black' : 'text-gray-400 bg-gray-50'}`}>
                         {match.court.split('(')[0]}
                     </span>
                 </div>
                 
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start justify-between gap-4 relative">
                     <div className="flex-1 text-right flex flex-col items-end">
-                        <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? 'text-favale-dark' : 'text-gray-700'}`}>
+                        <span className={`font-bold text-lg leading-tight ${match.isFinished && homeSets > awaySets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.homeTeamId)}
                         </span>
                         {match.isFinished && (
-                            <span className="text-2xl font-black text-favale-dark mt-1">{homeSets}</span>
+                            <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{homeSets}</span>
                         )}
                     </div>
                     
                     <div className="flex flex-col items-center justify-center min-w-[30px] pt-1">
-                         <span className="text-gray-300 font-bold text-sm">VS</span>
+                         <span className={`${isFinal ? 'text-black/50' : 'text-gray-300'} font-bold text-sm`}>VS</span>
                     </div>
 
                     <div className="flex-1 text-left flex flex-col items-start">
-                        <span className={`font-bold text-lg leading-tight ${match.isFinished && awaySets > homeSets ? 'text-favale-dark' : 'text-gray-700'}`}>
+                        <span className={`font-bold text-lg leading-tight ${match.isFinished && awaySets > homeSets ? (isFinal ? 'text-black' : 'text-favale-dark') : (isFinal ? 'text-black/80' : 'text-gray-700')}`}>
                             {getTeamName(match.awayTeamId)}
                         </span>
                         {match.isFinished && (
-                            <span className="text-2xl font-black text-favale-dark mt-1">{awaySets}</span>
+                            <span className={`text-2xl font-black ${isFinal ? 'text-black' : 'text-favale-dark'} mt-1`}>{awaySets}</span>
                         )}
                     </div>
+                </div>
+
+                <div className="flex justify-center mt-2">
+                     <span className="bg-green-100 text-green-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        {match.stage}
+                     </span>
                 </div>
 
                 {match.isFinished && (
@@ -804,6 +835,22 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                             <label className="text-xs font-bold text-gray-500 block mb-1">Hora</label>
                             <input type="time" className="w-full p-2 border rounded text-sm" value={newMatchData.time} onChange={e => setNewMatchData({...newMatchData, time: e.target.value})} />
                          </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 block mb-1">Instancia</label>
+                        <select
+                            className="w-full p-2 border rounded text-sm"
+                            value={newMatchData.stage}
+                            onChange={e => setNewMatchData({...newMatchData, stage: e.target.value})}
+                        >
+                            <option value="Fase de Grupos">Fase de Grupos</option>
+                            <option value="Octavos de Final">Octavos de Final</option>
+                            <option value="Cuartos de Final">Cuartos de Final</option>
+                            <option value="Semifinales">Semifinales</option>
+                            <option value="Final">Final</option>
+                            <option value="3er y 4to Puesto">3er y 4to Puesto</option>
+                        </select>
                     </div>
 
                     <div className="space-y-2 pt-2">
@@ -901,9 +948,10 @@ const PositionsView = ({ teams, matches }: any) => {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-500 font-bold text-[10px] uppercase tracking-wider text-center">
                         <tr>
-                            <th className="px-3 py-3 text-left w-1/2">Equipo</th>
-                            <th className="px-2 py-3">PJ</th>
-                            <th className="px-2 py-3">PG</th>
+                            <th className="px-3 py-3 text-left w-1/3">Equipo</th>
+                            <th className="px-1 py-3">PJ</th>
+                            <th className="px-1 py-3">PG</th>
+                            <th className="px-1 py-3">Dif</th>
                             <th className="px-2 py-3 text-favale-dark font-black">PTS</th>
                         </tr>
                     </thead>
@@ -912,10 +960,13 @@ const PositionsView = ({ teams, matches }: any) => {
                             <tr key={row.teamId} className="hover:bg-gray-50">
                                 <td className="px-3 py-3 font-bold text-gray-700 flex items-center gap-2">
                                     <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-bold ${idx < 2 ? 'bg-favale-primary text-white' : 'bg-gray-100 text-gray-500'}`}>{idx + 1}</span>
-                                    {row.teamName}
+                                    <span className="truncate max-w-[100px] block" title={row.teamName}>{row.teamName}</span>
                                 </td>
-                                <td className="px-2 py-3 text-center text-gray-500">{row.played}</td>
-                                <td className="px-2 py-3 text-center text-gray-500">{row.won}</td>
+                                <td className="px-1 py-3 text-center text-gray-500">{row.played}</td>
+                                <td className="px-1 py-3 text-center text-gray-500">{row.won}</td>
+                                <td className={`px-1 py-3 text-center text-[10px] font-bold ${row.pointsDiff > 0 ? 'text-green-600' : row.pointsDiff < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {row.pointsDiff > 0 ? '+' : ''}{row.pointsDiff}
+                                </td>
                                 <td className="px-2 py-3 text-center font-black text-favale-dark bg-green-50/50">{row.points}</td>
                             </tr>
                         )) : (
@@ -935,19 +986,7 @@ const PositionsView = ({ teams, matches }: any) => {
 
         // LOGIC: Sub 13 Female (Zones + Cups)
         if (selectedCategory === Category.SUB13 && selectedGender === Gender.FEMALE) {
-            const zoneA = generateTable(matches, genderTeams, Category.SUB13, 'A');
-            const zoneB = generateTable(matches, genderTeams, Category.SUB13, 'B');
-
-            // Calculate Qualifiers (Top 2 for Gold, Rest for Silver)
-            const goldTeamsIds = [...zoneA.slice(0, 2), ...zoneB.slice(0, 2)].map(r => r.teamId);
-            const silverTeamsIds = [...zoneA.slice(2), ...zoneB.slice(2)].map(r => r.teamId);
-
-            const goldTeams = genderTeams.filter((t: Team) => goldTeamsIds.includes(t.id));
-            const silverTeams = genderTeams.filter((t: Team) => silverTeamsIds.includes(t.id));
-
-            // "Arrastre de puntos": generating table with only these teams calculates points based on matches between them
-            const goldTable = generateTable(matches, goldTeams, Category.SUB13);
-            const silverTable = generateTable(matches, silverTeams, Category.SUB13);
+            const { zoneA, zoneB, goldTable, silverTable } = getCupStandings(matches, genderTeams, Category.SUB13);
 
             return (
                 <div className="space-y-6">
@@ -961,7 +1000,7 @@ const PositionsView = ({ teams, matches }: any) => {
                             <Trophy size={20} className="fill-yellow-500 text-yellow-600"/>
                             <h3 className="font-bold uppercase tracking-tight">Copa de Oro</h3>
                         </div>
-                        <p className="text-[10px] text-yellow-600 mb-3 -mt-2">Clasifican los 2 mejores de cada zona. (Arrastre de puntos)</p>
+                        <p className="text-[10px] text-yellow-600 mb-3 -mt-2">Clasifican el 1° y 2° de cada zona. (Arrastre de puntos)</p>
                         <RenderTableBlock title="Tabla Oro" data={goldTable} />
                     </div>
 
@@ -1264,6 +1303,15 @@ const App = () => {
       fetchData();
   };
 
+  const handleUpdatePlayer = async (player: any) => {
+    await supabase.from('jugadores').update({
+        nombre: player.name,
+        numero: player.number,
+        posicion: player.position
+    }).eq('id', player.id);
+    fetchData();
+  };
+
   const handleDeletePlayer = async (id: string) => {
     console.log('id de jugador'+id);  
     await supabase.from('jugadores').delete().eq('id', id);
@@ -1272,7 +1320,8 @@ const App = () => {
 
   // Match CRUD
   const handleAddMatch = async (match: Partial<Match>) => {
-      await supabase.from('partidos').insert([{
+      console.log("Adding match:", match);
+      const { error, data } = await supabase.from('partidos').insert([{
           fecha: match.date,
           hora: match.time,
           lugar: match.court,
@@ -1280,20 +1329,36 @@ const App = () => {
           genero: match.gender,
           local: match.homeTeamId,
           visitante: match.awayTeamId,
+          etapa: match.stage,
           is_finished: false,
           sets: []
-      }]);
-      fetchData();
+      }]).select();
+
+      if(error) {
+          console.error("Error creating match:", error);
+          alert("Error al crear partido: " + error.message);
+      } else {
+          console.log("Match created successfully:", data);
+          fetchData();
+          // Force UI refresh if needed, but fetchData() sets state
+      }
   };
 
   const handleUpdateMatch = async (match: Match) => {
-     await supabase.from('partidos').update({
+     const { error } = await supabase.from('partidos').update({
          sets: JSON.stringify(match.sets),
          is_finished: match.isFinished,
          mvp_local: match.mvpHomeId,
-         mvp_visitante: match.mvpAwayId
+         mvp_visitante: match.mvpAwayId,
+         etapa: match.stage
      }).eq('id', match.id);
-     fetchData();
+
+     if(error) {
+         console.error("Error updating match:", error);
+         alert("Error al actualizar partido: " + error.message);
+     } else {
+         fetchData();
+     }
   };
   
   const handleDeleteMatch = async (id: string) => {
@@ -1320,7 +1385,7 @@ const App = () => {
   const renderContent = () => {
       switch(activeTab) {
           case 'home': return <HomeView />;
-          case 'teams': return <TeamsView teams={teams} matches={matches} isAdmin={isAdmin} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={handleDeleteTeam} onAddPlayer={handleAddPlayer} onDeletePlayer={handleDeletePlayer} />;
+          case 'teams': return <TeamsView teams={teams} matches={matches} isAdmin={isAdmin} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={handleDeleteTeam} onAddPlayer={handleAddPlayer} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} />;
           case 'fixture': return <FixtureView matches={matches} teams={teams} isAdmin={isAdmin} onUpdateMatch={handleUpdateMatch} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} isLoading={loading} />;
           case 'positions': return <PositionsView teams={teams} matches={matches} />;
           case 'locations': return <LocationsView />;
