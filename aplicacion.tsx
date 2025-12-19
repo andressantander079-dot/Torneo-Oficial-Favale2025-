@@ -847,8 +847,9 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
                             <option value="Fase de Grupos">Fase de Grupos</option>
                             <option value="Octavos de Final">Octavos de Final</option>
                             <option value="Cuartos de Final">Cuartos de Final</option>
-                            <option value="Semifinal">Semifinal</option>
+                            <option value="Semifinales">Semifinales</option>
                             <option value="Final">Final</option>
+                            <option value="3er y 4to Puesto">3er y 4to Puesto</option>
                         </select>
                     </div>
 
