@@ -715,10 +715,10 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
             const homeSets = match.sets.filter(s => s.home > s.away).length;
             const awaySets = match.sets.filter(s => s.away > s.home).length;
 
-            const isFinal = match.stage?.toLowerCase().includes('final');
+            const isFinal = match.stage === 'Final';
 
             return (
-            <div key={match.id} className={`${isFinal ? 'bg-yellow-400 text-black border-l-black' : 'bg-white border-l-favale-accent'} rounded-xl p-4 shadow-sm border-l-4 relative overflow-hidden`}>
+            <div key={match.id} className={`${isFinal ? 'bg-yellow-500 text-black border-l-black' : 'bg-white border-l-favale-accent'} rounded-xl p-4 shadow-sm border-l-4 relative overflow-hidden`}>
                 <div className={`flex justify-between items-center mb-4 ${isFinal ? 'border-black/10' : 'border-gray-200'} border-b pb-2`}>
                     <span className={`${isFinal ? 'text-black' : 'text-favale-dark'} font-lexend font-bold text-base flex items-center gap-2 uppercase tracking-tight`}>
                         <Calendar size={18} strokeWidth={2.5}/> {getFormattedDate(match.date)}, {match.time}HS
@@ -839,13 +839,18 @@ const FixtureView = ({ matches, teams, isAdmin, onUpdateMatch, onAddMatch, onDel
 
                     <div>
                         <label className="text-xs font-bold text-gray-500 block mb-1">Instancia</label>
-                        <input
-                            type="text"
+                        <select
                             className="w-full p-2 border rounded text-sm"
-                            placeholder="Ej: Fase de Grupos, Final, Semis..."
                             value={newMatchData.stage}
                             onChange={e => setNewMatchData({...newMatchData, stage: e.target.value})}
-                        />
+                        >
+                            <option value="Fase de Grupos">Fase de Grupos</option>
+                            <option value="Octavos de Final">Octavos de Final</option>
+                            <option value="Cuartos de Final">Cuartos de Final</option>
+                            <option value="Semifinales">Semifinales</option>
+                            <option value="Final">Final</option>
+                            <option value="3er y 4to Puesto">3er y 4to Puesto</option>
+                        </select>
                     </div>
 
                     <div className="space-y-2 pt-2">
@@ -1323,6 +1328,7 @@ const App = () => {
           genero: match.gender,
           local: match.homeTeamId,
           visitante: match.awayTeamId,
+          etapa: match.stage,
           is_finished: false,
           sets: []
       }]);
@@ -1334,7 +1340,8 @@ const App = () => {
          sets: JSON.stringify(match.sets),
          is_finished: match.isFinished,
          mvp_local: match.mvpHomeId,
-         mvp_visitante: match.mvpAwayId
+         mvp_visitante: match.mvpAwayId,
+         etapa: match.stage
      }).eq('id', match.id);
      fetchData();
   };
